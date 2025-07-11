@@ -38,12 +38,13 @@ class Macro(private val name: String) {
                     is Action.Wait -> delay(action.millis)
                     is Action.InputText -> withContext(Dispatchers.IO) { tapper.inputText(action.text) }
                     is Action.ClickNorm -> {
-                        val pt = util.ScreenAdapter.toScreen(action.n)
+                        val pt = util.ScreenAdapter.toScreen(action.n, screenMeta ?: util.ScreenAdapter.currentMeta(scope.coroutineContext[androidx.lifecycle.LifecycleOwner]?.javaClass?.kotlin?.objectInstance as android.content.Context))
                         withContext(Dispatchers.IO) { tapper.tap(pt.x, pt.y) }
                     }
                     is Action.SwipeNorm -> {
-                        val s = util.ScreenAdapter.toScreen(action.start)
-                        val e = util.ScreenAdapter.toScreen(action.end)
+                        val meta = screenMeta ?: util.ScreenAdapter.currentMeta(scope.coroutineContext[androidx.lifecycle.LifecycleOwner]?.javaClass?.kotlin?.objectInstance as android.content.Context)
+                        val s = util.ScreenAdapter.toScreen(action.start, meta)
+                        val e = util.ScreenAdapter.toScreen(action.end, meta)
                         withContext(Dispatchers.IO) { tapper.swipe(s.x, s.y, e.x, e.y, action.durationMs) }
                     }
                 }
@@ -52,6 +53,8 @@ class Macro(private val name: String) {
     }
 
     var repeatCount: Int = 1
+
+    var screenMeta: util.ScreenMeta? = null
 }
 
 class MacroBuilder(private val name: String) {
