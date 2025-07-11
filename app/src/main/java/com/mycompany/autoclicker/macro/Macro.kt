@@ -38,10 +38,13 @@ class Macro(private val name: String) {
                     is Action.Wait -> delay(action.millis)
                     is Action.InputText -> withContext(Dispatchers.IO) { tapper.inputText(action.text) }
                     is Action.ClickNorm -> {
-                        val pt = util.ScreenAdapter.toScreen(action.n, scope.coroutineContext[androidx.lifecycle.LifecycleOwner] as android.content.Context) // can't get ctx, so ignore for now
+                        val pt = util.ScreenAdapter.toScreen(action.n)
+                        withContext(Dispatchers.IO) { tapper.tap(pt.x, pt.y) }
                     }
                     is Action.SwipeNorm -> {
-                        // convert and send
+                        val s = util.ScreenAdapter.toScreen(action.start)
+                        val e = util.ScreenAdapter.toScreen(action.end)
+                        withContext(Dispatchers.IO) { tapper.swipe(s.x, s.y, e.x, e.y, action.durationMs) }
                     }
                 }
             }

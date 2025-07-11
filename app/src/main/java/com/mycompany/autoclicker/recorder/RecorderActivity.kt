@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.content.Intent
+import com.mycompany.autoclicker.util.ScreenAdapter
 import androidx.core.content.FileProvider
 import java.io.File
 import android.app.Dialog
@@ -80,9 +81,12 @@ class RecorderActivity : AppCompatActivity() {
                     val upX = event.rawX; val upY = event.rawY
                     val dist2 = (upX-downX)*(upX-downX)+(upY-downY)*(upY-downY)
                     if (dist2 < 25*25) {
-                        recordedActions.add(Action.Click(upX.toInt(), upY.toInt(), delayMs))
+                        val norm = ScreenAdapter.toNorm(upX, upY, this)
+                        recordedActions.add(Action.ClickNorm(norm, delayMs))
                     } else {
-                        recordedActions.add(Action.Swipe(downX.toInt(), downY.toInt(), upX.toInt(), upY.toInt(), durationSwipe, delayMs))
+                        val nStart = ScreenAdapter.toNorm(downX, downY, this)
+                        val nEnd = ScreenAdapter.toNorm(upX, upY, this)
+                        recordedActions.add(Action.SwipeNorm(nStart, nEnd, durationSwipe, delayMs))
                     }
                     prevActionTime = now
                 }
@@ -105,6 +109,15 @@ class RecorderActivity : AppCompatActivity() {
                 for (a in recordedActions) {
                     delay(a.delayMs)
                     when(a) {
+                        is Action.ClickNorm -> {
+                            val pt = ScreenAdapter.toScreen(a.n)
+                            overlay.flashDot(pt.x, pt.y)
+                        }
+                        is Action.SwipeNorm -> {
+                            val s = ScreenAdapter.toScreen(a.start)
+                            val e = ScreenAdapter.toScreen(a.end)
+                            overlay.animateSwipe(Action.Swipe(s.x, s.y, e.x, e.y, a.durationMs))
+                        }
                         is Action.Click -> overlay.flashDot(a.x, a.y)
                         is Action.Swipe -> overlay.animateSwipe(a)
                         else -> {}
