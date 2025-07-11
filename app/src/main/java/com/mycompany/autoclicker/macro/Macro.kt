@@ -30,6 +30,8 @@ class Macro(private val name: String) {
                 }
             }
             for (action in step.actions) {
+                if (action is Action.Click) delay(action.delayMs)
+                if (action is Action.Swipe) delay(action.delayMs)
                 when (action) {
                     is Action.Click -> withContext(Dispatchers.IO) { tapper.tap(action.x, action.y) }
                     is Action.Swipe -> withContext(Dispatchers.IO) { tapper.swipe(action.x1, action.y1, action.x2, action.y2, action.durationMs) }
@@ -39,6 +41,8 @@ class Macro(private val name: String) {
             }
         }
     }
+
+    var repeatCount: Int = 1
 }
 
 class MacroBuilder(private val name: String) {

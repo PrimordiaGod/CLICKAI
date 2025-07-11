@@ -10,6 +10,9 @@ import com.mycompany.autoclicker.R
 import com.mycompany.autoclicker.macro.Action
 import com.mycompany.autoclicker.macro.Macro
 import com.mycompany.autoclicker.ui.DetectionOverlayView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class RecorderActivity : AppCompatActivity() {
 
@@ -21,6 +24,8 @@ class RecorderActivity : AppCompatActivity() {
     private val recordedActions = mutableListOf<Action>()
     private var lastDownTime: Long = 0L
     private var recording = false
+    private var prevActionTime: Long = 0L
+    private var repeatCount = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,13 +48,7 @@ class RecorderActivity : AppCompatActivity() {
             btnStart.isEnabled = true
         }
         btnPreview.setOnClickListener {
-            // build macro and preview (not implemented fully)
-            val macro = Macro("recorded").apply {
-                doActions(recordedActions)
-            }
-            val json = Gson().toJson(macro)
-            // show JSON temporary
-            android.widget.Toast.makeText(this, json.take(120), android.widget.Toast.LENGTH_LONG).show()
+            previewMacro()
         }
 
         overlay.setOnTouchListener { _, event ->
@@ -58,18 +57,47 @@ class RecorderActivity : AppCompatActivity() {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     lastDownTime = System.currentTimeMillis()
+                    downX = event.rawX; downY = event.rawY
                 }
                 MotionEvent.ACTION_UP -> {
-                    val upTime = System.currentTimeMillis()
-                    val duration = upTime - lastDownTime
-                    val dx = event.x - event.downTime // not correct
-                    val dy = 0f
-                    if (duration < 200) {
-                        recordedActions.add(Action.Click(event.x.toInt(), event.y.toInt()))
+                    val now = System.currentTimeMillis()
+                    val delayMs = if (prevActionTime==0L) 0 else now-prevActionTime
+                    val durationSwipe = (now - lastDownTime).toInt()
+                    val upX = event.rawX; val upY = event.rawY
+                    val dist2 = (upX-downX)*(upX-downX)+(upY-downY)*(upY-downY)
+                    if (dist2 < 25*25) {
+                        recordedActions.add(Action.Click(upX.toInt(), upY.toInt(), delayMs))
+                    } else {
+                        recordedActions.add(Action.Swipe(downX.toInt(), downY.toInt(), upX.toInt(), upY.toInt(), durationSwipe, delayMs))
                     }
+                    prevActionTime = now
                 }
             }
             false
+        }
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+
+    private fun previewMacro() {
+        if (recordedActions.isEmpty()) return
+        val m = Macro("preview")
+        m.repeatCount = repeatCount
+        m.doActions(recordedActions)
+        overlay.clearGhosts()
+        lifecycleScope.launch {
+            repeat(repeatCount) {
+                for (a in recordedActions) {
+                    delay(a.delayMs)
+                    when(a) {
+                        is Action.Click -> overlay.flashDot(a.x, a.y)
+                        is Action.Swipe -> overlay.animateSwipe(a)
+                        else -> {}
+                    }
+                    if (a is Action.Swipe) delay(a.durationMs.toLong())
+                }
+            }
         }
     }
 }

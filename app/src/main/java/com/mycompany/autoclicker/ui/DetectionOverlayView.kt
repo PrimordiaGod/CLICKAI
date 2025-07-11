@@ -56,6 +56,22 @@ class DetectionOverlayView @JvmOverloads constructor(
             val (from, to) = pair
             canvas.drawLine(from.centerX().toFloat(), from.centerY().toFloat(), to.centerX().toFloat(), to.centerY().toFloat(), arrowPaint)
         }
+
+        // ghosts
+        val need = updateGhosts()
+        for (g in ghosts) {
+            if (g.type==0) {
+                val alpha = (255*(1-g.progress)).toInt()
+                ghostPaint.alpha = alpha
+                canvas.drawCircle(g.startX, g.startY, 20f*(1+g.progress), ghostPaint)
+            } else {
+                ghostPaint.alpha = 200
+                val cx = g.startX + (g.endX-g.startX)*g.progress
+                val cy = g.startY + (g.endY-g.startY)*g.progress
+                canvas.drawCircle(cx, cy, 18f, ghostPaint)
+            }
+        }
+        if (need) postInvalidateOnAnimation()
     }
 
     // ----- user selection support -----
@@ -137,5 +153,41 @@ class DetectionOverlayView @JvmOverloads constructor(
             }
         }
         return true
+    }
+
+    // ------- Ghost preview -------
+    private data class Ghost(val type:Int, val startX:Float, val startY:Float, val endX:Float, val endY:Float, var progress:Float, val duration:Long, val startTime:Long)
+    private val ghosts = mutableListOf<Ghost>()
+    private val ghostPaint = Paint().apply {
+        color = Color.GREEN
+        style = Paint.Style.FILL
+    }
+
+    fun flashDot(x:Int, y:Int) {
+        ghosts.add(Ghost(0,x.toFloat(),y.toFloat(),0f,0f,0f,400,System.currentTimeMillis()))
+        invalidate()
+    }
+
+    fun animateSwipe(action: com.mycompany.autoclicker.macro.Action.Swipe) {
+        ghosts.add(Ghost(1,action.x1.toFloat(),action.y1.toFloat(),action.x2.toFloat(),action.y2.toFloat(),0f,action.durationMs.toLong(),System.currentTimeMillis()))
+        invalidate()
+    }
+
+    fun clearGhosts() { ghosts.clear(); invalidate() }
+
+    private fun updateGhosts():Boolean {
+        val now = System.currentTimeMillis()
+        var invalidateNeeded=false
+        val iterator = ghosts.iterator()
+        while(iterator.hasNext()) {
+            val g = iterator.next()
+            val elapsed = now - g.startTime
+            if (elapsed >= g.duration) {
+                iterator.remove(); continue
+            }
+            g.progress = elapsed.toFloat()/g.duration
+            invalidateNeeded=true
+        }
+        return invalidateNeeded
     }
 }
