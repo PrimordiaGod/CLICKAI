@@ -10,6 +10,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.Gson
 import com.mycompany.autoclicker.ui.DetectionOverlayView
 import androidx.appcompat.app.AppCompatActivity
+import com.mycompany.autoclicker.R
 
 class PatternEditorActivity : AppCompatActivity() {
 
@@ -32,15 +33,19 @@ class PatternEditorActivity : AppCompatActivity() {
         preview.setImageBitmap(bmp)
 
         overlay.setOnBoxDrawnListener { rect ->
-            // Simple: every new rect is a Template placeholder
-            val el = Element.Template(Bitmap.createBitmap(bmp!!, rect.left, rect.top, rect.width(), rect.height()))
-            elementRects[rect] = el
+            val dialog = ElementSelectionDialog(this, onElementCreated = { el ->
+                elementRects[rect] = el
+            }, regionBitmapProvider = {
+                Bitmap.createBitmap(bmp!!, rect.left, rect.top, rect.width(), rect.height())
+            }, regionRectProvider = { rect })
+            dialog.show()
         }
         overlay.setOnArrowDrawnListener { from, to ->
             val anchor = elementRects[from] ?: return@setOnArrowDrawnListener
             val rel = elementRects[to] ?: return@setOnArrowDrawnListener
             val relation = guessRelation(from, to)
             rules += PatternRule(anchor, rel, relation)
+            overlay.addArrow(from, to)
         }
 
         fab.setOnClickListener {

@@ -50,6 +50,12 @@ class DetectionOverlayView @JvmOverloads constructor(
         for (sel in selections) {
             canvas.drawRect(sel, userPaint)
         }
+
+        // draw arrows
+        for (pair in arrows) {
+            val (from, to) = pair
+            canvas.drawLine(from.centerX().toFloat(), from.centerY().toFloat(), to.centerX().toFloat(), to.centerY().toFloat(), arrowPaint)
+        }
     }
 
     // ----- user selection support -----
@@ -79,6 +85,17 @@ class DetectionOverlayView @JvmOverloads constructor(
 
     fun setOnBoxDrawnListener(l: (Rect) -> Unit) { this.boxListener = object: BoxListener{override fun onBoxDrawn(rect: Rect)=l(rect)} }
     fun setOnArrowDrawnListener(l: (Rect, Rect) -> Unit) { this.arrowListener = object: ArrowListener{override fun onArrowDrawn(from: Rect, to: Rect)=l(from,to)} }
+
+    private val arrows = mutableListOf<Pair<Rect, Rect>>()
+    private val arrowPaint = Paint().apply {
+        color = Color.MAGENTA
+        strokeWidth = 5f
+    }
+
+    fun addArrow(from: Rect, to: Rect) {
+        arrows.add(from to to)
+        invalidate()
+    }
 
     // touch handling for pattern edit
     private enum class Mode { NONE, DRAW_BOX, DRAG_ARROW }
