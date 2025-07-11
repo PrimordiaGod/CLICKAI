@@ -37,6 +37,12 @@ class Macro(private val name: String) {
                     is Action.Swipe -> withContext(Dispatchers.IO) { tapper.swipe(action.x1, action.y1, action.x2, action.y2, action.durationMs) }
                     is Action.Wait -> delay(action.millis)
                     is Action.InputText -> withContext(Dispatchers.IO) { tapper.inputText(action.text) }
+                    is Action.ClickNorm -> {
+                        val pt = util.ScreenAdapter.toScreen(action.n, scope.coroutineContext[androidx.lifecycle.LifecycleOwner] as android.content.Context) // can't get ctx, so ignore for now
+                    }
+                    is Action.SwipeNorm -> {
+                        // convert and send
+                    }
                 }
             }
         }
