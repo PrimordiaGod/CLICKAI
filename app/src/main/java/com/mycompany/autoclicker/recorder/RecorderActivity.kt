@@ -13,6 +13,14 @@ import com.mycompany.autoclicker.ui.DetectionOverlayView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
+import android.app.Dialog
+import android.widget.EditText
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.mycompany.autoclicker.recorder.DelayAdapter
 
 class RecorderActivity : AppCompatActivity() {
 
@@ -20,6 +28,7 @@ class RecorderActivity : AppCompatActivity() {
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
     private lateinit var btnPreview: Button
+    private lateinit var btnSave: Button
 
     private val recordedActions = mutableListOf<Action>()
     private var lastDownTime: Long = 0L
@@ -34,6 +43,7 @@ class RecorderActivity : AppCompatActivity() {
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
         btnPreview = findViewById(R.id.btnPreview)
+        btnSave = findViewById(R.id.btnSave)
 
         btnStart.setOnClickListener {
             recording = true
@@ -46,9 +56,13 @@ class RecorderActivity : AppCompatActivity() {
             btnStop.isEnabled = false
             btnPreview.isEnabled = true
             btnStart.isEnabled = true
+            showParamDialog()
         }
         btnPreview.setOnClickListener {
             previewMacro()
+        }
+        btnSave.setOnClickListener {
+            saveMacro()
         }
 
         overlay.setOnTouchListener { _, event ->
@@ -99,5 +113,38 @@ class RecorderActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showParamDialog() {
+        val dlg = Dialog(this)
+        dlg.setContentView(R.layout.dialog_action_editor)
+        val etRepeat = dlg.findViewById<EditText>(R.id.etRepeat)
+        etRepeat.setText(repeatCount.toString())
+        val rv = dlg.findViewById<RecyclerView>(R.id.rvActions)
+        rv.layoutManager = LinearLayoutManager(this)
+        rv.adapter = DelayAdapter(recordedActions)
+        dlg.findViewById<Button>(R.id.btnOK).setOnClickListener {
+            repeatCount = etRepeat.text.toString().toIntOrNull() ?: 1
+            dlg.dismiss()
+        }
+        dlg.show()
+    }
+
+    private fun saveMacro() {
+        val macro = Macro("recorded").apply {
+            repeatCount = this@RecorderActivity.repeatCount
+            doActions(recordedActions)
+        }
+        val json = Gson().toJson(macro)
+        val file = File(filesDir, "macro_${System.currentTimeMillis()}.json")
+        file.writeText(json)
+        // Share intent
+        val uri = FileProvider.getUriForFile(this, "${packageName}.provider", file)
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(share, "Share Macro"))
     }
 }
