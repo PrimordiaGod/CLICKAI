@@ -19,6 +19,8 @@ import com.mycompany.autoclicker.macro.*
 import com.mycompany.autoclicker.tap.TapClient
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import android.view.MotionEvent
+import android.view.View
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,6 +47,33 @@ class MainActivity : AppCompatActivity() {
         }
 
         ScreenGrabber.requestPermission(this)
+
+        // Set touch listener for selection mode (long press toggles)
+        overlay.setOnTouchListener(object : View.OnTouchListener {
+            var startX = 0f
+            var startY = 0f
+            var selecting = false
+            override fun onTouch(v: View?, event: MotionEvent?): Boolean {
+                event ?: return false
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        startX = event.x
+                        startY = event.y
+                        selecting = true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (selecting) {
+                            val endX = event.x
+                            val endY = event.y
+                            val rect = Rect(startX.toInt(), startY.toInt(), endX.toInt(), endY.toInt())
+                            overlay.addSelection(rect)
+                            selecting = false
+                        }
+                    }
+                }
+                return true
+            }
+        })
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

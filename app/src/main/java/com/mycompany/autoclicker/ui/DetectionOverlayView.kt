@@ -44,5 +44,28 @@ class DetectionOverlayView @JvmOverloads constructor(
             val cy = rect.centerY().toFloat()
             canvas.drawCircle(cx, cy, 8f, paintCircle)
         }
+
+        // draw user selections
+        for (sel in selections) {
+            canvas.drawRect(sel, userPaint)
+        }
+    }
+
+    // ----- user selection support -----
+    private val selections = mutableListOf<Rect>()
+    private val userPaint = Paint().apply {
+        color = Color.YELLOW
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
+    fun addSelection(rect: Rect) {
+        selections.add(rect)
+        invalidate()
+    }
+
+    fun clearSelections() {
+        selections.clear()
+        invalidate()
     }
 }
