@@ -15,6 +15,10 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mycompany.autoclicker.cv.ColorDetector
 import com.mycompany.autoclicker.cv.CvTemplateMatcher
 import com.mycompany.autoclicker.ui.DetectionOverlayView
+import com.mycompany.autoclicker.macro.*
+import com.mycompany.autoclicker.tap.TapClient
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -22,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var preview: ImageView
     private lateinit var overlay: DetectionOverlayView
     private lateinit var tvInfo: TextView
+    private val scope = MainScope()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,8 +75,11 @@ class MainActivity : AppCompatActivity() {
                                 overlay.sampleColor = sampledColor
                                 tvInfo.text = "Score: %.2f Scale: %.2f\nRGB: #%06X".format(result.score, result.scale, sampledColor and 0xFFFFFF)
                             }
+                        // for demo, run macro once condition satisfied
+                        if (result.score > 0.9f) {
+                            runMacro(bitmap)
                         }
-                    }
+                        }
                     frameCount++
                 }
             }
@@ -85,5 +93,21 @@ class MainActivity : AppCompatActivity() {
         val paint = Paint().apply { color = Color.RED }
         canvas.drawRect(0f, 0f, size.toFloat(), size.toFloat(), paint)
         return bmp
+    }
+
+    private fun runMacro(frame: Bitmap) {
+        val tapper = TapClient()
+        val m = macro("demo") {
+            waitUntil(Condition.TemplatePresent(generateTemplateBitmap(), 0.9f)) {
+                click(100, 200)
+                waitMs(500)
+            }
+            actions {
+                inputText("hello")
+            }
+        }
+        scope.launch {
+            m.execute(scope, { frame }, tapper)
+        }
     }
 }
