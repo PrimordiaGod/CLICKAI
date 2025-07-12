@@ -20,6 +20,13 @@ sealed class Action {
         var delayVarianceMs: Long = 0L
     ) : Action()
     data class Wait(val millis: Long) : Action()
+    data class WaitRandom(val minMs: Long, val maxMs: Long) : Action()
+    data class MultiClick(
+        val points: List<Pair<Int, Int>>, // list of (x,y)
+        var delayBetweenMs: Long = 0L,
+        var jitterPx: Int = 0,
+        var delayVarianceMs: Long = 0L
+    ) : Action()
     data class InputText(val text: String) : Action()
     data class ClickNorm(val n: util.ScreenAdapter.Normalised, var delayMs: Long = 0L) : Action()
     data class SwipeNorm(val start: util.ScreenAdapter.Normalised, val end: util.ScreenAdapter.Normalised, val durationMs: Int = 100, var delayMs: Long = 0L) : Action()

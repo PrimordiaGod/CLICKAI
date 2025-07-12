@@ -97,6 +97,10 @@ The following capabilities have recently been added to bring the project closer 
    * `clickRandom` and `swipeRandom` helpers in the macro builder make it trivial to define randomised actions in one line.
 4. **Cleaner execution loop** – macros now honour their own `repeatCount` internally, simplifying client code.
 
+5. **Multi-point support** – `Action.MultiClick` triggers multi-tap gestures across a set of coordinates with optional jitter & per-point delay.
+6. **Random wait** – `waitRandom(min,max)` picks a random sleep duration for yet more human-like behaviour.
+7. **Persistent macro store** – macros can now be saved & loaded from the `files/macros/` directory via `MacroStorage`.
+
 These improvements are fully backwards-compatible: older macros compile and run unchanged while new parameters default to deterministic behaviour.
 
 ---

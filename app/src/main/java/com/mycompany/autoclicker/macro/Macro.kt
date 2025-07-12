@@ -39,11 +39,14 @@ class Macro(private val name: String) {
                     val extraDelay = when (action) {
                         is Action.Click -> if (action.delayVarianceMs != 0L) Random.nextLong(-action.delayVarianceMs, action.delayVarianceMs + 1) else 0L
                         is Action.Swipe -> if (action.delayVarianceMs != 0L) Random.nextLong(-action.delayVarianceMs, action.delayVarianceMs + 1) else 0L
+                        is Action.MultiClick -> if (action.delayVarianceMs != 0L) Random.nextLong(-action.delayVarianceMs, action.delayVarianceMs + 1) else 0L
+                        is Action.WaitRandom -> 0L
                         else -> 0L
                     }
                     val baseDelay = when (action) {
                         is Action.Click -> action.delayMs
                         is Action.Swipe -> action.delayMs
+                        is Action.MultiClick -> action.delayBetweenMs
                         else -> 0L
                     }
                     if (baseDelay + extraDelay > 0) delay(baseDelay + extraDelay)
@@ -57,6 +60,20 @@ class Macro(private val name: String) {
                             val (sx1, sy1) = randomizedPoint(action.x1, action.y1, action.jitterPx)
                             val (sx2, sy2) = randomizedPoint(action.x2, action.y2, action.jitterPx)
                             withContext(Dispatchers.IO) { tapper.swipe(sx1, sy1, sx2, sy2, action.durationMs) }
+                        }
+                        is Action.MultiClick -> {
+                            for ((idx, pt) in action.points.withIndex()) {
+                                val (cx, cy) = randomizedPoint(pt.first, pt.second, action.jitterPx)
+                                withContext(Dispatchers.IO) { tapper.tap(cx, cy) }
+                                if (idx < action.points.lastIndex) {
+                                    val innerDelay = action.delayBetweenMs + Random.nextLong(-action.delayVarianceMs, action.delayVarianceMs + 1)
+                                    if (innerDelay > 0) delay(innerDelay)
+                                }
+                            }
+                        }
+                        is Action.WaitRandom -> {
+                            val wait = Random.nextLong(action.minMs, action.maxMs + 1)
+                            delay(wait)
                         }
                         is Action.Wait -> delay(action.millis)
                         is Action.InputText -> withContext(Dispatchers.IO) { tapper.inputText(action.text) }
@@ -139,6 +156,11 @@ class ActionsScope {
             delayVarianceMs = delayVarianceMs
         )
     )
+
+    fun multiClick(points: List<Pair<Int, Int>>, delayBetweenMs: Long = 0L, jitterPx: Int = 0, delayVarianceMs: Long = 0L) =
+        list.add(Action.MultiClick(points, delayBetweenMs, jitterPx, delayVarianceMs))
+
+    fun waitRandom(minMs: Long, maxMs: Long) = list.add(Action.WaitRandom(minMs, maxMs))
 }
 
 fun macro(name: String, builder: MacroBuilder.() -> Unit): Macro {

@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.MotionEvent
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
-import com.google.gson.Gson
 import com.mycompany.autoclicker.R
 import com.mycompany.autoclicker.macro.Action
 import com.mycompany.autoclicker.macro.Macro
@@ -148,9 +147,7 @@ class RecorderActivity : AppCompatActivity() {
             repeatCount = this@RecorderActivity.repeatCount
             doActions(recordedActions)
         }
-        val json = Gson().toJson(macro)
-        val file = File(filesDir, "macro_${System.currentTimeMillis()}.json")
-        file.writeText(json)
+        val file = com.mycompany.autoclicker.macro.MacroStorage.save(this, macro, "recorded_${System.currentTimeMillis()}")
         // Share intent
         val uri = FileProvider.getUriForFile(this, "${packageName}.provider", file)
         val share = Intent(Intent.ACTION_SEND).apply {
