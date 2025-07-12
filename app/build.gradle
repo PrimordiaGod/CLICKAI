@@ -58,6 +58,35 @@ dependencies {
     implementation 'org.opencv:opencv:4.9.0'
     implementation 'com.googlecode.tesseract.android:tess-two:9.1.0'
     implementation 'com.github.skydoves:colorpickerview:2.2.4'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.preference:preference-ktx:1.2.1'
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'androidx.room:room-runtime:2.6.1'
+    implementation 'androidx.room:room-ktx:2.6.1'
+    kapt 'androidx.room:room-compiler:2.6.1'
+    
+    // Advanced UI and Animation
+    implementation 'com.airbnb.android:lottie:6.2.0'
+    implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+    
+    // Accessibility Services
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    
+    // Performance and Analytics
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+    
+    // Image Processing (existing OpenCV)
+    implementation 'org.opencv:opencv-android:4.9.0'
+    
+    // OCR (existing)
+    implementation 'com.rmtheis:tess-two:9.1.0'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
