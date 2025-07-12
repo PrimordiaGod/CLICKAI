@@ -84,3 +84,19 @@ Push & start the binary, then grant the permission as shown in the installation 
 
 ## Licence
 Apache 2.0
+
+### vNext Enhancements
+
+The following capabilities have recently been added to bring the project closer to commercial-grade autoclickers such as *Automatic Clicker* by Huau Apps:
+
+1. **Configurable repeat count** – every macro can now be executed multiple times (or indefinitely) by simply setting `macro.repeatCount`.
+2. **Randomisation**
+   * *Coordinate jitter* – `Action.Click` / `Action.Swipe` accept a `jitterPx` value that randomly offsets the tap/swipe start & end positions, greatly reducing detection by anti-bot heuristics.
+   * *Delay variance* – optional `delayVarianceMs` adds a ±mtime random component to any click or swipe delay.
+3. **Helper DSL**
+   * `clickRandom` and `swipeRandom` helpers in the macro builder make it trivial to define randomised actions in one line.
+4. **Cleaner execution loop** – macros now honour their own `repeatCount` internally, simplifying client code.
+
+These improvements are fully backwards-compatible: older macros compile and run unchanged while new parameters default to deterministic behaviour.
+
+---

@@ -16,7 +16,6 @@ import com.mycompany.autoclicker.cv.ColorDetector
 import com.mycompany.autoclicker.cv.CvTemplateMatcher
 import com.mycompany.autoclicker.ui.DetectionOverlayView
 import com.mycompany.autoclicker.macro.*
-import com.mycompany.autoclicker.tap.TapClient
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import android.view.MotionEvent
@@ -125,7 +124,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun runMacro(frame: Bitmap) {
-        val tapper = TapClient()
+        val tapper = com.mycompany.autoclicker.tap.TapClient(this)
         val m = macro("demo") {
             waitUntil(Condition.TemplatePresent(generateTemplateBitmap(), 0.9f)) {
                 click(100, 200)

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 
 class Macro(private val name: String) {
     internal val steps = mutableListOf<Step>()
@@ -21,31 +22,54 @@ class Macro(private val name: String) {
     }
 
     suspend fun execute(scope: CoroutineScope, frameProvider: suspend () -> Bitmap, tapper: TapInterface) {
-        for (step in steps) {
-            if (step.condition != null) {
-                while (true) {
-                    val frame = frameProvider()
-                    if (step.condition.eval(frame)) break
-                    delay(200)
-                }
-            }
-            for (action in step.actions) {
-                if (action is Action.Click) delay(action.delayMs)
-                if (action is Action.Swipe) delay(action.delayMs)
-                when (action) {
-                    is Action.Click -> withContext(Dispatchers.IO) { tapper.tap(action.x, action.y) }
-                    is Action.Swipe -> withContext(Dispatchers.IO) { tapper.swipe(action.x1, action.y1, action.x2, action.y2, action.durationMs) }
-                    is Action.Wait -> delay(action.millis)
-                    is Action.InputText -> withContext(Dispatchers.IO) { tapper.inputText(action.text) }
-                    is Action.ClickNorm -> {
-                        val pt = util.ScreenAdapter.toScreen(action.n, screenMeta ?: util.ScreenAdapter.currentMeta(scope.coroutineContext[androidx.lifecycle.LifecycleOwner]?.javaClass?.kotlin?.objectInstance as android.content.Context))
-                        withContext(Dispatchers.IO) { tapper.tap(pt.x, pt.y) }
+        repeat(repeatCount) {
+            for (step in steps) {
+                // --- wait for condition if present ---
+                if (step.condition != null) {
+                    while (true) {
+                        val frame = frameProvider()
+                        if (step.condition.eval(frame)) break
+                        delay(200)
                     }
-                    is Action.SwipeNorm -> {
-                        val meta = screenMeta ?: util.ScreenAdapter.currentMeta(scope.coroutineContext[androidx.lifecycle.LifecycleOwner]?.javaClass?.kotlin?.objectInstance as android.content.Context)
-                        val s = util.ScreenAdapter.toScreen(action.start, meta)
-                        val e = util.ScreenAdapter.toScreen(action.end, meta)
-                        withContext(Dispatchers.IO) { tapper.swipe(s.x, s.y, e.x, e.y, action.durationMs) }
+                }
+
+                // --- execute actions ---
+                for (action in step.actions) {
+                    // compute dynamic delay with variance (if supported)
+                    val extraDelay = when (action) {
+                        is Action.Click -> if (action.delayVarianceMs != 0L) Random.nextLong(-action.delayVarianceMs, action.delayVarianceMs + 1) else 0L
+                        is Action.Swipe -> if (action.delayVarianceMs != 0L) Random.nextLong(-action.delayVarianceMs, action.delayVarianceMs + 1) else 0L
+                        else -> 0L
+                    }
+                    val baseDelay = when (action) {
+                        is Action.Click -> action.delayMs
+                        is Action.Swipe -> action.delayMs
+                        else -> 0L
+                    }
+                    if (baseDelay + extraDelay > 0) delay(baseDelay + extraDelay)
+
+                    when (action) {
+                        is Action.Click -> {
+                            val (tx, ty) = randomizedPoint(action.x, action.y, action.jitterPx)
+                            withContext(Dispatchers.IO) { tapper.tap(tx, ty) }
+                        }
+                        is Action.Swipe -> {
+                            val (sx1, sy1) = randomizedPoint(action.x1, action.y1, action.jitterPx)
+                            val (sx2, sy2) = randomizedPoint(action.x2, action.y2, action.jitterPx)
+                            withContext(Dispatchers.IO) { tapper.swipe(sx1, sy1, sx2, sy2, action.durationMs) }
+                        }
+                        is Action.Wait -> delay(action.millis)
+                        is Action.InputText -> withContext(Dispatchers.IO) { tapper.inputText(action.text) }
+                        is Action.ClickNorm -> {
+                            val pt = util.ScreenAdapter.toScreen(action.n, screenMeta ?: util.ScreenAdapter.currentMeta(scope.coroutineContext[androidx.lifecycle.LifecycleOwner]?.javaClass?.kotlin?.objectInstance as android.content.Context))
+                            withContext(Dispatchers.IO) { tapper.tap(pt.x, pt.y) }
+                        }
+                        is Action.SwipeNorm -> {
+                            val meta = screenMeta ?: util.ScreenAdapter.currentMeta(scope.coroutineContext[androidx.lifecycle.LifecycleOwner]?.javaClass?.kotlin?.objectInstance as android.content.Context)
+                            val s = util.ScreenAdapter.toScreen(action.start, meta)
+                            val e = util.ScreenAdapter.toScreen(action.end, meta)
+                            withContext(Dispatchers.IO) { tapper.swipe(s.x, s.y, e.x, e.y, action.durationMs) }
+                        }
                     }
                 }
             }
@@ -55,6 +79,13 @@ class Macro(private val name: String) {
     var repeatCount: Int = 1
 
     var screenMeta: util.ScreenMeta? = null
+
+    private fun randomizedPoint(x: Int, y: Int, jitter: Int): Pair<Int, Int> {
+        if (jitter <= 0) return Pair(x, y)
+        val dx = (-jitter..jitter).random()
+        val dy = (-jitter..jitter).random()
+        return Pair(x + dx, y + dy)
+    }
 }
 
 class MacroBuilder(private val name: String) {
@@ -82,6 +113,32 @@ class ActionsScope {
     fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, duration: Int = 100) = list.add(Action.Swipe(x1, y1, x2, y2, duration))
     fun waitMs(ms: Long) = list.add(Action.Wait(ms))
     fun inputText(text: String) = list.add(Action.InputText(text))
+
+    // Advanced helpers
+    fun clickRandom(x: Int, y: Int, jitterPx: Int, delayMs: Long = 0L, delayVarianceMs: Long = 0L) =
+        list.add(Action.Click(x, y, delayMs = delayMs, jitterPx = jitterPx, delayVarianceMs = delayVarianceMs))
+
+    fun swipeRandom(
+        x1: Int,
+        y1: Int,
+        x2: Int,
+        y2: Int,
+        duration: Int = 100,
+        jitterPx: Int,
+        delayMs: Long = 0L,
+        delayVarianceMs: Long = 0L
+    ) = list.add(
+        Action.Swipe(
+            x1,
+            y1,
+            x2,
+            y2,
+            durationMs = duration,
+            delayMs = delayMs,
+            jitterPx = jitterPx,
+            delayVarianceMs = delayVarianceMs
+        )
+    )
 }
 
 fun macro(name: String, builder: MacroBuilder.() -> Unit): Macro {
