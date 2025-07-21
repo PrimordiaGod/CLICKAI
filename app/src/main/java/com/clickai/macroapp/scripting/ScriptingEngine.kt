@@ -5,11 +5,15 @@ import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.StringScriptSource
 import kotlin.script.experimental.jvm.JvmScriptCompiler
 import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
+import com.clickai.macroapp.vision.ScreenCaptureUtil
+import com.clickai.macroapp.vision.ScreenRecognizer
+import com.clickai.macroapp.vision.TemplateStorage
+import android.app.Activity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ScriptingEngine(private val player: MacroPlayer, private val recorder: MacroRecorder) {
-    fun runScript(script: String, onComplete: (() -> Unit)? = null) {
-        // Expose macro APIs as simple functions in the script context
-        // For now, just parse and execute a limited set of commands
+    suspend fun runScriptWithVision(activity: Activity, script: String, onComplete: (() -> Unit)? = null) {
         val lines = script.lines()
         val actions = mutableListOf<MacroAction>()
         for (line in lines) {
@@ -32,18 +36,39 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                     actions.add(MacroAction.Loop(args[0], args[1], args[2]))
                 }
                 trimmed.startsWith("recognizeText(") -> {
-                    // Example: recognizeText("Battle Started")
-                    // In a real app, this would capture the screen and run OCR
-                    // Here, just simulate always false for now
-                    // actions.add(MacroAction.Wait(0)) // Placeholder
+                    val text = trimmed.removePrefix("recognizeText(").removeSuffix(")").trim('"')
+                    val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
+                    if (bitmap != null) {
+                        ScreenRecognizer.initTesseract(activity)
+                        val found = ScreenRecognizer.recognizeText(bitmap).contains(text, ignoreCase = true)
+                        if (!found) break // Stop script if not found
+                    }
                 }
                 trimmed.startsWith("matchTemplate(") -> {
-                    // Example: matchTemplate("reward.png")
-                    // In a real app, this would capture the screen and run template matching
-                    // Here, just simulate always false for now
+                    val name = trimmed.removePrefix("matchTemplate(").removeSuffix(")").trim('"')
+                    val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
+                    val template = TemplateStorage.loadTemplate(activity, name)
+                    if (bitmap != null && template != null) {
+                        val found = ScreenRecognizer.matchTemplate(bitmap, template)
+                        if (!found) break // Stop script if not found
+                    }
                 }
             }
         }
         player.play(actions, onComplete)
     }
 }
+
+suspend fun captureScreenSuspend(activity: Activity): android.graphics.Bitmap? =
+    withContext(Dispatchers.Main) {
+        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            ScreenCaptureUtil.requestScreenCapture(activity)
+            activity.runOnUiThread {
+                activity.onActivityResult = { requestCode, resultCode, data ->
+                    ScreenCaptureUtil.onActivityResult(activity, requestCode, resultCode, data) { bitmap ->
+                        cont.resume(bitmap, null)
+                    }
+                }
+            }
+        }
+    }
