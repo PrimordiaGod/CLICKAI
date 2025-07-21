@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CLICKAI Macro App</string>
+    <string name="accessibility_service_description">CLICKAI Macro Accessibility Service for recording and automating gestures in games.</string>
 </resources>
