@@ -18,6 +18,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.ViewPropertyAnimatorListenerAdapter
 import com.clickai.macroapp.scripting.*
 import com.clickai.macroapp.vision.*
+import android.content.Intent
+import android.graphics.Bitmap
 
 class MainActivity : AppCompatActivity() {
     private val recorder = MacroRecorder()
@@ -34,6 +36,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var templateList: ListView
     private lateinit var templateAdapter: ArrayAdapter<String>
     private var selectedTemplate: String? = null
+    private var pendingTemplateName: String? = null
+    private var pendingTestTemplate: String? = null
+    private var pendingOCR: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -135,7 +140,13 @@ class MainActivity : AppCompatActivity() {
             selectedTemplate = templateAdapter.getItem(position)
         }
         findViewById<Button>(R.id.btnCaptureTemplate).setOnClickListener {
-            Toast.makeText(this, "Capture not implemented in this stub.", Toast.LENGTH_SHORT).show()
+            val name = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (name.isNotBlank()) {
+                pendingTemplateName = name
+                ScreenCaptureUtil.requestScreenCapture(this)
+            } else {
+                Toast.makeText(this, "Enter macro/template name first", Toast.LENGTH_SHORT).show()
+            }
         }
         findViewById<Button>(R.id.btnUploadTemplate).setOnClickListener {
             Toast.makeText(this, "Upload not implemented in this stub.", Toast.LENGTH_SHORT).show()
@@ -149,18 +160,48 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnTestTemplate).setOnClickListener {
             selectedTemplate?.let { name ->
-                // In a real app, capture the screen and compare with template
-                val template = TemplateStorage.loadTemplate(this, name)
-                if (template != null) {
-                    // Stub: always false
-                    val match = false
-                    Toast.makeText(this, "Template match: $match", Toast.LENGTH_SHORT).show()
-                }
+                pendingTestTemplate = name
+                ScreenCaptureUtil.requestScreenCapture(this)
             }
         }
         findViewById<Button>(R.id.btnTestOCR).setOnClickListener {
-            // In a real app, capture a region and run OCR
-            Toast.makeText(this, "OCR test not implemented in this stub.", Toast.LENGTH_SHORT).show()
+            pendingOCR = true
+            ScreenCaptureUtil.requestScreenCapture(this)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (pendingTemplateName != null) {
+            ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
+                bitmap?.let {
+                    // Stub: use full screen as template
+                    TemplateStorage.saveTemplate(this, pendingTemplateName!!, it)
+                    refreshTemplateList()
+                    Toast.makeText(this, "Template captured", Toast.LENGTH_SHORT).show()
+                }
+                pendingTemplateName = null
+            }
+        } else if (pendingTestTemplate != null) {
+            ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
+                bitmap?.let {
+                    val template = TemplateStorage.loadTemplate(this, pendingTestTemplate!!)
+                    if (template != null) {
+                        val match = ScreenRecognizer.matchTemplate(it, template)
+                        Toast.makeText(this, "Template match: $match", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                pendingTestTemplate = null
+            }
+        } else if (pendingOCR) {
+            ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
+                bitmap?.let {
+                    ScreenRecognizer.initTesseract(this)
+                    val text = ScreenRecognizer.recognizeText(it)
+                    Toast.makeText(this, "OCR: $text", Toast.LENGTH_LONG).show()
+                }
+                pendingOCR = false
+            }
         }
     }
 
