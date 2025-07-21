@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <ImageView
+        android:id="@+id/correctionScreenshot"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="Screenshot preview" />
+
+    <TextView
+        android:id="@+id/correctionOcrText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="OCR result here"
+        android:paddingTop="8dp" />
+
+    <EditText
+        android:id="@+id/correctionName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Correction name (optional)" />
+
+    <EditText
+        android:id="@+id/correctionDesc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Description (optional)" />
+
+</LinearLayout>

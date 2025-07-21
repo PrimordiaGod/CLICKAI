@@ -6,8 +6,22 @@ import com.google.gson.reflect.TypeToken
 import java.io.File
 
 // Correction event data model
-// interruptionKey: e.g., "text:Battle Started" or "template:reward"
-data class CorrectionEvent(val interruptionKey: String, val actions: List<MacroAction>)
+// type: "text", "template", "image"
+// signature: e.g., text string, template name, or image hash
+// screenshotPath: for preview
+// ocrResult: for preview
+// name/description: user-provided
+
+data class CorrectionEvent(
+    val id: String, // type:signature
+    val type: String,
+    val signature: String,
+    val screenshotPath: String? = null,
+    val ocrResult: String? = null,
+    val actions: List<MacroAction>,
+    val name: String = "",
+    val description: String = ""
+)
 
 object CorrectionStorage {
     private val gson = Gson()
@@ -15,13 +29,21 @@ object CorrectionStorage {
 
     fun saveCorrection(context: Context, event: CorrectionEvent) {
         val all = loadAll(context).toMutableList()
-        all.removeAll { it.interruptionKey == event.interruptionKey }
+        all.removeAll { it.id == event.id }
         all.add(event)
         file(context).writeText(gson.toJson(all))
     }
 
-    fun getCorrection(context: Context, interruptionKey: String): CorrectionEvent? {
-        return loadAll(context).find { it.interruptionKey == interruptionKey }
+    fun getCorrection(context: Context, id: String): CorrectionEvent? {
+        return loadAll(context).find { it.id == id }
+    }
+
+    fun getAll(context: Context): List<CorrectionEvent> = loadAll(context)
+
+    fun deleteCorrection(context: Context, id: String) {
+        val all = loadAll(context).toMutableList()
+        all.removeAll { it.id == id }
+        file(context).writeText(gson.toJson(all))
     }
 
     private fun loadAll(context: Context): List<CorrectionEvent> {
