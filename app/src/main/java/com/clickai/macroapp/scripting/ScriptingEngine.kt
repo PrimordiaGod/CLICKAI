@@ -31,6 +31,17 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                     val args = trimmed.removePrefix("loop(").removeSuffix(")").split(",").map { it.trim().toInt() }
                     actions.add(MacroAction.Loop(args[0], args[1], args[2]))
                 }
+                trimmed.startsWith("recognizeText(") -> {
+                    // Example: recognizeText("Battle Started")
+                    // In a real app, this would capture the screen and run OCR
+                    // Here, just simulate always false for now
+                    // actions.add(MacroAction.Wait(0)) // Placeholder
+                }
+                trimmed.startsWith("matchTemplate(") -> {
+                    // Example: matchTemplate("reward.png")
+                    // In a real app, this would capture the screen and run template matching
+                    // Here, just simulate always false for now
+                }
             }
         }
         player.play(actions, onComplete)
