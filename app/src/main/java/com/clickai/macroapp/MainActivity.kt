@@ -80,6 +80,11 @@ class MainActivity : AppCompatActivity() {
             showEditActionDialog(position)
         }
         refreshTimeline()
+        val loopBtn = Button(this)
+        loopBtn.text = "Add Loop"
+        loopBtn.setOnClickListener { showAddLoopDialog() }
+        val layout = findViewById<LinearLayout>(R.id.mainLayout)
+        layout.addView(loopBtn, 2) // Insert after macro controls
     }
 
     private fun refreshMacroList() {
@@ -140,6 +145,45 @@ class MainActivity : AppCompatActivity() {
             }
             refreshTimeline()
         }
+        builder.show()
+    }
+
+    private fun showAddLoopDialog() {
+        val actions = recorder.getActions().toMutableList()
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Add Loop")
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.VERTICAL
+        val startInput = EditText(this)
+        startInput.inputType = InputType.TYPE_CLASS_NUMBER
+        startInput.hint = "Start index (0-based)"
+        val endInput = EditText(this)
+        endInput.inputType = InputType.TYPE_CLASS_NUMBER
+        endInput.hint = "End index (0-based)"
+        val countInput = EditText(this)
+        countInput.inputType = InputType.TYPE_CLASS_NUMBER
+        countInput.hint = "Repeat count"
+        layout.addView(startInput)
+        layout.addView(endInput)
+        layout.addView(countInput)
+        builder.setView(layout)
+        builder.setPositiveButton("Add") { _, _ ->
+            val start = startInput.text.toString().toIntOrNull() ?: 0
+            val end = endInput.text.toString().toIntOrNull() ?: 0
+            val count = countInput.text.toString().toIntOrNull() ?: 1
+            actions.add(MacroAction.Loop(start, end, count))
+            recorder.clear()
+            actions.forEach {
+                when (it) {
+                    is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
+                    is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
+                    is MacroAction.Wait -> recorder.recordWait(it.duration)
+                    is MacroAction.Loop -> {} // Already added
+                }
+            }
+            refreshTimeline()
+        }
+        builder.setNegativeButton("Cancel", null)
         builder.show()
     }
 }
