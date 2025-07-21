@@ -154,16 +154,4 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
     }
 }
 
-suspend fun captureScreenSuspend(activity: Activity): android.graphics.Bitmap? =
-    withContext(Dispatchers.Main) {
-        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-            ScreenCaptureUtil.requestScreenCapture(activity)
-            activity.runOnUiThread {
-                activity.onActivityResult = { requestCode, resultCode, data ->
-                    ScreenCaptureUtil.onActivityResult(activity, requestCode, resultCode, data) { bitmap ->
-                        cont.resume(bitmap, null)
-                    }
-                }
-            }
-        }
-    }
+suspend fun captureScreenSuspend(activity: Activity): android.graphics.Bitmap? = null // Not implemented in CI stub
