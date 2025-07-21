@@ -21,3 +21,9 @@
 
 ---
 This is a minimal Android project scaffold. All advanced macro and AI features will be implemented in subsequent steps.
+
+## Download APK
+
+After each push to the `main` branch, the latest debug APK is built automatically by GitHub Actions.
+
+You can download the latest APK from the [Actions tab](https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/actions) (look for the most recent workflow run and download the `app-debug-apk` artifact).
