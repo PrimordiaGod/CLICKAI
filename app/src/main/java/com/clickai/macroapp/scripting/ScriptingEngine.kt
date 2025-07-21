@@ -11,13 +11,16 @@ import com.clickai.macroapp.vision.TemplateStorage
 import android.app.Activity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.clickai.macroapp.macro.engine.CorrectionStorage
+import com.clickai.macroapp.macro.engine.CorrectionEvent
 
 class ScriptingEngine(private val player: MacroPlayer, private val recorder: MacroRecorder) {
     suspend fun runScriptWithVision(
         activity: Activity,
         script: String,
         onComplete: (() -> Unit)? = null,
-        onPause: ((String) -> Unit)? = null
+        onPause: ((String) -> Unit)? = null,
+        onRequestCorrection: (suspend (String) -> List<MacroAction>?)? = null
     ) {
         val lines = script.lines()
         val actions = mutableListOf<MacroAction>()
@@ -42,11 +45,25 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                 }
                 trimmed.startsWith("recognizeText(") -> {
                     val text = trimmed.removePrefix("recognizeText(").removeSuffix(")").trim('"')
+                    val key = "text:$text"
                     val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
                     if (bitmap != null) {
                         ScreenRecognizer.initTesseract(activity)
                         val found = ScreenRecognizer.recognizeText(bitmap).contains(text, ignoreCase = true)
                         if (!found) {
+                            // Check for correction
+                            val correction = CorrectionStorage.getCorrection(activity, key)
+                            if (correction != null) {
+                                actions.addAll(correction.actions)
+                                continue
+                            } else if (onRequestCorrection != null) {
+                                val userActions = onRequestCorrection(key)
+                                if (userActions != null) {
+                                    CorrectionStorage.saveCorrection(activity, CorrectionEvent(key, userActions))
+                                    actions.addAll(userActions)
+                                    continue
+                                }
+                            }
                             onPause?.invoke("Text '$text' not found. Macro paused.")
                             return
                         }
@@ -54,11 +71,25 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                 }
                 trimmed.startsWith("matchTemplate(") -> {
                     val name = trimmed.removePrefix("matchTemplate(").removeSuffix(")").trim('"')
+                    val key = "template:$name"
                     val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
                     val template = TemplateStorage.loadTemplate(activity, name)
                     if (bitmap != null && template != null) {
                         val found = ScreenRecognizer.matchTemplate(bitmap, template)
                         if (!found) {
+                            // Check for correction
+                            val correction = CorrectionStorage.getCorrection(activity, key)
+                            if (correction != null) {
+                                actions.addAll(correction.actions)
+                                continue
+                            } else if (onRequestCorrection != null) {
+                                val userActions = onRequestCorrection(key)
+                                if (userActions != null) {
+                                    CorrectionStorage.saveCorrection(activity, CorrectionEvent(key, userActions))
+                                    actions.addAll(userActions)
+                                    continue
+                                }
+                            }
                             onPause?.invoke("Template '$name' not found. Macro paused.")
                             return
                         }
