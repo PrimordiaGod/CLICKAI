@@ -45,7 +45,8 @@ android {
                 'kotlin/internal/internal.kotlin_builtins',
                 'kotlin/reflect/reflect.kotlin_builtins',
                 'kotlin/kotlin.kotlin_builtins',
-                'kotlin/coroutines/coroutines.kotlin_builtins'
+                'kotlin/coroutines/coroutines.kotlin_builtins',
+                'kotlin/ranges/ranges.kotlin_builtins'
             ]
         }
     }
