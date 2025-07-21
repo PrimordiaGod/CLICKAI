@@ -42,7 +42,8 @@ android {
                 'META-INF/NOTICE.txt',
                 'META-INF/notice.txt',
                 'META-INF/ASL2.0',
-                'kotlin/internal/internal.kotlin_builtins'
+                'kotlin/internal/internal.kotlin_builtins',
+                'kotlin/reflect/reflect.kotlin_builtins'
             ]
         }
     }
