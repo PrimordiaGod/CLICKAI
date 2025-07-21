@@ -13,7 +13,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class ScriptingEngine(private val player: MacroPlayer, private val recorder: MacroRecorder) {
-    suspend fun runScriptWithVision(activity: Activity, script: String, onComplete: (() -> Unit)? = null) {
+    suspend fun runScriptWithVision(
+        activity: Activity,
+        script: String,
+        onComplete: (() -> Unit)? = null,
+        onPause: ((String) -> Unit)? = null
+    ) {
         val lines = script.lines()
         val actions = mutableListOf<MacroAction>()
         for (line in lines) {
@@ -41,7 +46,10 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                     if (bitmap != null) {
                         ScreenRecognizer.initTesseract(activity)
                         val found = ScreenRecognizer.recognizeText(bitmap).contains(text, ignoreCase = true)
-                        if (!found) break // Stop script if not found
+                        if (!found) {
+                            onPause?.invoke("Text '$text' not found. Macro paused.")
+                            return
+                        }
                     }
                 }
                 trimmed.startsWith("matchTemplate(") -> {
@@ -50,7 +58,10 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                     val template = TemplateStorage.loadTemplate(activity, name)
                     if (bitmap != null && template != null) {
                         val found = ScreenRecognizer.matchTemplate(bitmap, template)
-                        if (!found) break // Stop script if not found
+                        if (!found) {
+                            onPause?.invoke("Template '$name' not found. Macro paused.")
+                            return
+                        }
                     }
                 }
             }
