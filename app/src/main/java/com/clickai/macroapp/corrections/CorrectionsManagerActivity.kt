@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.ViewGroup
 import android.view.View
 import android.widget.*
 import com.clickai.macroapp.R
@@ -61,7 +63,7 @@ class CorrectionsAdapter(context: Context, private val corrections: List<Correct
     override fun getItem(position: Int) = corrections[position]
     override fun getItemId(position: Int) = position.toLong()
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-        val view = inflater.inflate(R.layout.correction_list_item, parent, false)
+        val view = convertView ?: inflater.inflate(R.layout.correction_list_item, parent, false)
         val event = corrections[position]
         val nameView = view.findViewById<TextView>(R.id.correctionListName)
         val descView = view.findViewById<TextView>(R.id.correctionListDesc)

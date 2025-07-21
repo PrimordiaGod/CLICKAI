@@ -22,6 +22,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import com.clickai.macroapp.corrections.CorrectionsManagerActivity
 import com.google.android.material.snackbar.Snackbar
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val recorder = MacroRecorder()
@@ -59,8 +61,10 @@ class MainActivity : AppCompatActivity() {
         scriptList.adapter = scriptAdapter
         editScript = findViewById(R.id.editScript)
         findViewById<Button>(R.id.btnRunScript).setOnClickListener {
-            scriptingEngine.runScript(editScript.text.toString()) {
-                Toast.makeText(this, "Script finished", Toast.LENGTH_SHORT).show()
+            lifecycleScope.launch {
+                scriptingEngine.runScriptWithVision(this@MainActivity, editScript.text.toString()) {
+                    Toast.makeText(this@MainActivity, "Script finished", Toast.LENGTH_SHORT).show()
+                }
             }
         }
         findViewById<Button>(R.id.btnSaveScript).setOnClickListener {
@@ -115,6 +119,7 @@ class MainActivity : AppCompatActivity() {
                         is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
                         is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
                         is MacroAction.Wait -> recorder.recordWait(it.duration)
+                        is MacroAction.Loop -> {} // Already added
                     }
                 }
                 refreshTimeline()
@@ -247,6 +252,7 @@ class MainActivity : AppCompatActivity() {
             is MacroAction.Tap -> delayInput.setText(action.delay.toString())
             is MacroAction.Swipe -> delayInput.setText(action.delay.toString())
             is MacroAction.Wait -> delayInput.setText(action.duration.toString())
+            is MacroAction.Loop -> {} // Already added
         }
         layout.addView(delayInput)
         builder.setView(layout)
@@ -256,6 +262,7 @@ class MainActivity : AppCompatActivity() {
                 is MacroAction.Tap -> actions[position] = action.copy(delay = delay)
                 is MacroAction.Swipe -> actions[position] = action.copy(delay = delay)
                 is MacroAction.Wait -> actions[position] = action.copy(duration = delay)
+                is MacroAction.Loop -> {} // Already added
             }
             recorder.clear()
             actions.forEach {
@@ -263,6 +270,7 @@ class MainActivity : AppCompatActivity() {
                     is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
                     is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
                     is MacroAction.Wait -> recorder.recordWait(it.duration)
+                    is MacroAction.Loop -> {} // Already added
                 }
             }
             refreshTimeline()
@@ -276,6 +284,7 @@ class MainActivity : AppCompatActivity() {
                     is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
                     is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
                     is MacroAction.Wait -> recorder.recordWait(it.duration)
+                    is MacroAction.Loop -> {} // Already added
                 }
             }
             refreshTimeline()
@@ -380,6 +389,7 @@ class TimelineAdapter(private val context: Context, private val recorder: MacroR
                 is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
                 is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
                 is MacroAction.Wait -> recorder.recordWait(it.duration)
+                is MacroAction.Loop -> {} // Already added
             }
         }
         notifyDataSetChanged()

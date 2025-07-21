@@ -3,7 +3,6 @@ package com.clickai.macroapp.scripting
 import com.clickai.macroapp.macro.engine.*
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.StringScriptSource
-import kotlin.script.experimental.jvm.JvmScriptCompiler
 import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 import com.clickai.macroapp.vision.ScreenCaptureUtil
 import com.clickai.macroapp.vision.ScreenRecognizer
