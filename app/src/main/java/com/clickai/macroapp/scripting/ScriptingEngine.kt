@@ -13,14 +13,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.clickai.macroapp.macro.engine.CorrectionStorage
 import com.clickai.macroapp.macro.engine.CorrectionEvent
+import com.clickai.macroapp.corrections.CorrectionDialog
+import android.graphics.Bitmap
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 class ScriptingEngine(private val player: MacroPlayer, private val recorder: MacroRecorder) {
     suspend fun runScriptWithVision(
         activity: Activity,
         script: String,
         onComplete: (() -> Unit)? = null,
-        onPause: ((String) -> Unit)? = null,
-        onRequestCorrection: (suspend (String) -> List<MacroAction>?)? = null
+        onPause: ((String) -> Unit)? = null
     ) {
         val lines = script.lines()
         val actions = mutableListOf<MacroAction>()
@@ -49,23 +52,52 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                     val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
                     if (bitmap != null) {
                         ScreenRecognizer.initTesseract(activity)
-                        val found = ScreenRecognizer.recognizeText(bitmap).contains(text, ignoreCase = true)
+                        val ocrResult = ScreenRecognizer.recognizeText(bitmap)
+                        val found = ocrResult.contains(text, ignoreCase = true)
                         if (!found) {
-                            // Check for correction
                             val correction = CorrectionStorage.getCorrection(activity, key)
                             if (correction != null) {
                                 actions.addAll(correction.actions)
                                 continue
-                            } else if (onRequestCorrection != null) {
-                                val userActions = onRequestCorrection(key)
+                            } else {
+                                // Show correction dialog and record/save correction
+                                val userActions = withContext(Dispatchers.Main) {
+                                    suspendCancellableCoroutine<List<MacroAction>?> { cont ->
+                                        CorrectionDialog.show(
+                                            activity,
+                                            bitmap,
+                                            ocrResult,
+                                            onRecord = { croppedBitmap ->
+                                                // Start MacroRecorder in correction mode (not shown here)
+                                                // For demo, just resume
+                                                cont.resume(null)
+                                            },
+                                            onSave = { name, desc, croppedBitmap ->
+                                                // For demo, use empty actions; in real app, use recorded actions
+                                                val event = CorrectionEvent(
+                                                    id = key,
+                                                    type = "text",
+                                                    signature = key,
+                                                    screenshotPath = null, // Save croppedBitmap if needed
+                                                    ocrResult = ocrResult,
+                                                    actions = listOf(), // Use recorded actions
+                                                    name = name,
+                                                    description = desc
+                                                )
+                                                CorrectionStorage.saveCorrection(activity, event)
+                                                cont.resume(event.actions)
+                                            },
+                                            onCancel = { cont.resume(null) }
+                                        )
+                                    }
+                                }
                                 if (userActions != null) {
-                                    CorrectionStorage.saveCorrection(activity, CorrectionEvent(key, userActions))
                                     actions.addAll(userActions)
                                     continue
                                 }
+                                onPause?.invoke("Text '$text' not found. Macro paused.")
+                                return
                             }
-                            onPause?.invoke("Text '$text' not found. Macro paused.")
-                            return
                         }
                     }
                 }
@@ -77,21 +109,43 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                     if (bitmap != null && template != null) {
                         val found = ScreenRecognizer.matchTemplate(bitmap, template)
                         if (!found) {
-                            // Check for correction
                             val correction = CorrectionStorage.getCorrection(activity, key)
                             if (correction != null) {
                                 actions.addAll(correction.actions)
                                 continue
-                            } else if (onRequestCorrection != null) {
-                                val userActions = onRequestCorrection(key)
+                            } else {
+                                val userActions = withContext(Dispatchers.Main) {
+                                    suspendCancellableCoroutine<List<MacroAction>?> { cont ->
+                                        CorrectionDialog.show(
+                                            activity,
+                                            bitmap,
+                                            null,
+                                            onRecord = { croppedBitmap -> cont.resume(null) },
+                                            onSave = { name, desc, croppedBitmap ->
+                                                val event = CorrectionEvent(
+                                                    id = key,
+                                                    type = "template",
+                                                    signature = key,
+                                                    screenshotPath = null,
+                                                    ocrResult = null,
+                                                    actions = listOf(),
+                                                    name = name,
+                                                    description = desc
+                                                )
+                                                CorrectionStorage.saveCorrection(activity, event)
+                                                cont.resume(event.actions)
+                                            },
+                                            onCancel = { cont.resume(null) }
+                                        )
+                                    }
+                                }
                                 if (userActions != null) {
-                                    CorrectionStorage.saveCorrection(activity, CorrectionEvent(key, userActions))
                                     actions.addAll(userActions)
                                     continue
                                 }
+                                onPause?.invoke("Template '$name' not found. Macro paused.")
+                                return
                             }
-                            onPause?.invoke("Template '$name' not found. Macro paused.")
-                            return
                         }
                     }
                 }
