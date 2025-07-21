@@ -68,4 +68,53 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Scripting Console"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <EditText
+        android:id="@+id/editScript"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:hint="Write your script here..."
+        android:gravity="top|start"
+        android:inputType="textMultiLine"
+        android:scrollbars="vertical" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnRunScript"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Run" />
+        <Button
+            android:id="@+id/btnSaveScript"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Save" />
+        <Button
+            android:id="@+id/btnLoadScript"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Load" />
+        <Button
+            android:id="@+id/btnScriptHelp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Help" />
+    </LinearLayout>
+    <ListView
+        android:id="@+id/scriptList"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginBottom="8dp" />
+
 </LinearLayout>

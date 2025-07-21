@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.ViewPropertyAnimatorListenerAdapter
+import com.clickai.macroapp.scripting.*
 
 class MainActivity : AppCompatActivity() {
     private val recorder = MacroRecorder()
@@ -25,6 +26,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ArrayAdapter<String>
     private lateinit var timelineAdapter: TimelineAdapter
     private var currentMacroName: String = ""
+    private lateinit var scriptList: ListView
+    private lateinit var scriptAdapter: ArrayAdapter<String>
+    private lateinit var editScript: EditText
+    private lateinit var scriptingEngine: ScriptingEngine
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +41,39 @@ class MainActivity : AppCompatActivity() {
         macroList.adapter = adapter
         timelineAdapter = TimelineAdapter(this, recorder)
         timelineList.adapter = timelineAdapter
+
+        scriptingEngine = ScriptingEngine(player ?: MacroPlayer(MacroAccessibilityService()), recorder)
+        scriptList = findViewById(R.id.scriptList)
+        scriptAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, ScriptStorage.listScripts(this))
+        scriptList.adapter = scriptAdapter
+        editScript = findViewById(R.id.editScript)
+        findViewById<Button>(R.id.btnRunScript).setOnClickListener {
+            scriptingEngine.runScript(editScript.text.toString()) {
+                Toast.makeText(this, "Script finished", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnSaveScript).setOnClickListener {
+            val name = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (name.isNotBlank()) {
+                ScriptStorage.saveScript(this, name, editScript.text.toString())
+                refreshScriptList()
+                Toast.makeText(this, "Script saved", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnLoadScript).setOnClickListener {
+            val name = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (name.isNotBlank()) {
+                editScript.setText(ScriptStorage.loadScript(this, name))
+                Toast.makeText(this, "Script loaded", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnScriptHelp).setOnClickListener {
+            showScriptHelpDialog()
+        }
+        scriptList.setOnItemClickListener { _, _, position, _ ->
+            val scriptName = scriptAdapter.getItem(position) ?: return@setOnItemClickListener
+            findViewById<EditText>(R.id.editMacroName).setText(scriptName)
+        }
 
         findViewById<Button>(R.id.btnRecord).setOnClickListener {
             recorder.clear()
@@ -95,6 +133,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshTimeline() {
         timelineAdapter.notifyDataSetChanged()
+    }
+
+    private fun refreshScriptList() {
+        scriptAdapter.clear()
+        scriptAdapter.addAll(ScriptStorage.listScripts(this))
+        scriptAdapter.notifyDataSetChanged()
     }
 
     // --- Timeline Editing ---
@@ -185,6 +229,14 @@ class MainActivity : AppCompatActivity() {
         }
         builder.setNegativeButton("Cancel", null)
         builder.show()
+    }
+
+    private fun showScriptHelpDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Scripting API Help")
+            .setMessage("""Available APIs:\n- tap(x, y)\n- swipe(x1, y1, x2, y2, duration)\n- wait(ms)\n- loop(startIndex, endIndex, count)\n""")
+            .setPositiveButton("OK", null)
+            .show()
     }
 }
 
