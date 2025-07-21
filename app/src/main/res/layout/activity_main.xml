@@ -117,4 +117,56 @@
         android:layout_height="60dp"
         android:layout_marginBottom="8dp" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Template Management"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnCaptureTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Capture" />
+        <Button
+            android:id="@+id/btnUploadTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Upload" />
+        <Button
+            android:id="@+id/btnDeleteTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Delete" />
+        <Button
+            android:id="@+id/btnTestTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Test Match" />
+    </LinearLayout>
+    <ListView
+        android:id="@+id/templateList"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginBottom="8dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OCR Test"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <Button
+        android:id="@+id/btnTestOCR"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Test OCR on Screen" />
+
 </LinearLayout>
