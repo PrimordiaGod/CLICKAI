@@ -42,6 +42,6 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-scripting-common:1.9.0'
     implementation 'org.jetbrains.kotlin:kotlin-scripting-jvm:1.9.0'
     implementation 'org.openpnp:opencv:4.5.1-2'
-    implementation 'com.googlecode.tesseract.android:tess-two:9.1.0'
+    implementation 'com.googlecode.tesseract.android:tess-two:10.0.0'
     implementation 'com.github.yalantis:ucrop:2.2.8'
 }
