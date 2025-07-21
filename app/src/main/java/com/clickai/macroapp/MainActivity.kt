@@ -17,6 +17,7 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.ViewPropertyAnimatorListenerAdapter
 import com.clickai.macroapp.scripting.*
+import com.clickai.macroapp.vision.*
 
 class MainActivity : AppCompatActivity() {
     private val recorder = MacroRecorder()
@@ -30,6 +31,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scriptAdapter: ArrayAdapter<String>
     private lateinit var editScript: EditText
     private lateinit var scriptingEngine: ScriptingEngine
+    private lateinit var templateList: ListView
+    private lateinit var templateAdapter: ArrayAdapter<String>
+    private var selectedTemplate: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -123,6 +127,41 @@ class MainActivity : AppCompatActivity() {
         loopBtn.setOnClickListener { showAddLoopDialog() }
         val layout = findViewById<LinearLayout>(R.id.mainLayout)
         layout.addView(loopBtn, 2) // Insert after macro controls
+
+        templateList = findViewById(R.id.templateList)
+        templateAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, TemplateStorage.listTemplates(this))
+        templateList.adapter = templateAdapter
+        templateList.setOnItemClickListener { _, _, position, _ ->
+            selectedTemplate = templateAdapter.getItem(position)
+        }
+        findViewById<Button>(R.id.btnCaptureTemplate).setOnClickListener {
+            Toast.makeText(this, "Capture not implemented in this stub.", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.btnUploadTemplate).setOnClickListener {
+            Toast.makeText(this, "Upload not implemented in this stub.", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.btnDeleteTemplate).setOnClickListener {
+            selectedTemplate?.let {
+                TemplateStorage.deleteTemplate(this, it)
+                refreshTemplateList()
+                Toast.makeText(this, "Template deleted", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnTestTemplate).setOnClickListener {
+            selectedTemplate?.let { name ->
+                // In a real app, capture the screen and compare with template
+                val template = TemplateStorage.loadTemplate(this, name)
+                if (template != null) {
+                    // Stub: always false
+                    val match = false
+                    Toast.makeText(this, "Template match: $match", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        findViewById<Button>(R.id.btnTestOCR).setOnClickListener {
+            // In a real app, capture a region and run OCR
+            Toast.makeText(this, "OCR test not implemented in this stub.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun refreshMacroList() {
@@ -139,6 +178,12 @@ class MainActivity : AppCompatActivity() {
         scriptAdapter.clear()
         scriptAdapter.addAll(ScriptStorage.listScripts(this))
         scriptAdapter.notifyDataSetChanged()
+    }
+
+    private fun refreshTemplateList() {
+        templateAdapter.clear()
+        templateAdapter.addAll(TemplateStorage.listTemplates(this))
+        templateAdapter.notifyDataSetChanged()
     }
 
     // --- Timeline Editing ---
