@@ -91,13 +91,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnRecord).setOnClickListener {
-            recorder.clear()
-            Toast.makeText(this, "Recording started (use Accessibility button)", Toast.LENGTH_SHORT).show()
+            MacroAccessibilityService.recorder?.clear()
+            MacroAccessibilityService.recording = true
+            Toast.makeText(this, "Recording started. Use gestures in the app.", Toast.LENGTH_SHORT).show()
         }
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
-            val service = MacroAccessibilityService() // In real app, get running service instance
-            player = MacroPlayer(service)
-            player?.play(recorder.getActions()) {
+            MacroAccessibilityService.recording = false
+            val service = MacroAccessibilityService.instance
+            val player = if (service != null) MacroPlayer(service) else null
+            player?.play(MacroAccessibilityService.recorder?.getActions() ?: emptyList()) {
                 Toast.makeText(this, "Playback finished", Toast.LENGTH_SHORT).show()
             }
         }
