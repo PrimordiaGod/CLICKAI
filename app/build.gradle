@@ -6,6 +6,8 @@ plugins {
 repositories {
     google()
     mavenCentral()
+    jcenter() // For tess-two
+    maven { url 'https://jitpack.io' } // For uCrop
 }
 
 android {
