@@ -168,5 +168,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Test OCR on Screen" />
+    <Button
+        android:id="@+id/btnCorrectionsManager"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Manage Corrections"
+        android:layout_marginTop="12dp" />
 
 </LinearLayout>

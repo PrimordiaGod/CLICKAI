@@ -20,6 +20,8 @@ import com.clickai.macroapp.scripting.*
 import com.clickai.macroapp.vision.*
 import android.content.Intent
 import android.graphics.Bitmap
+import com.clickai.macroapp.corrections.CorrectionsManagerActivity
+import com.google.android.material.snackbar.Snackbar
 
 class MainActivity : AppCompatActivity() {
     private val recorder = MacroRecorder()
@@ -167,6 +169,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnTestOCR).setOnClickListener {
             pendingOCR = true
             ScreenCaptureUtil.requestScreenCapture(this)
+        }
+        findViewById<Button>(R.id.btnCorrectionsManager).setOnClickListener {
+            startActivity(Intent(this, CorrectionsManagerActivity::class.java))
         }
     }
 
@@ -323,6 +328,15 @@ class MainActivity : AppCompatActivity() {
             .setMessage("""Available APIs:\n- tap(x, y)\n- swipe(x1, y1, x2, y2, duration)\n- wait(ms)\n- loop(startIndex, endIndex, count)\n""")
             .setPositiveButton("OK", null)
             .show()
+    }
+
+    private fun showSnackbar(message: String, undo: (() -> Unit)? = null) {
+        val rootView = findViewById<View>(android.R.id.content)
+        val snackbar = Snackbar.make(rootView, message, Snackbar.LENGTH_LONG)
+        if (undo != null) {
+            snackbar.setAction("Undo") { undo() }
+        }
+        snackbar.show()
     }
 }
 
