@@ -7,8 +7,29 @@ import android.graphics.Path
 import android.util.Log
 
 class MacroAccessibilityService : AccessibilityService() {
+    companion object {
+        var instance: MacroAccessibilityService? = null
+        var recorder: MacroRecorder? = null
+        var recording: Boolean = false
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+        if (recorder == null) recorder = MacroRecorder()
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // TODO: Record gestures and UI events for macro recording
+        // For demo: record tap events (TYPE_TOUCH_INTERACTION_START)
+        if (recording && event != null && event.eventType == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START) {
+            val node = event.source ?: return
+            val bounds = android.graphics.Rect()
+            node.getBoundsInScreen(bounds)
+            val x = bounds.centerX().toFloat()
+            val y = bounds.centerY().toFloat()
+            recorder?.recordTap(x, y)
+            Log.d("MacroService", "Recorded tap at $x,$y")
+        }
     }
 
     override fun onInterrupt() {

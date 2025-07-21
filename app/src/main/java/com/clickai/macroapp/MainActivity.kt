@@ -91,13 +91,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnRecord).setOnClickListener {
-            recorder.clear()
-            Toast.makeText(this, "Recording started (use Accessibility button)", Toast.LENGTH_SHORT).show()
+            MacroAccessibilityService.recorder?.clear()
+            MacroAccessibilityService.recording = true
+            Toast.makeText(this, "Recording started. Use gestures in the app.", Toast.LENGTH_SHORT).show()
         }
         findViewById<Button>(R.id.btnPlay).setOnClickListener {
-            val service = MacroAccessibilityService() // In real app, get running service instance
-            player = MacroPlayer(service)
-            player?.play(recorder.getActions()) {
+            MacroAccessibilityService.recording = false
+            val service = MacroAccessibilityService.instance
+            val player = if (service != null) MacroPlayer(service) else null
+            player?.play(MacroAccessibilityService.recorder?.getActions() ?: emptyList()) {
                 Toast.makeText(this, "Playback finished", Toast.LENGTH_SHORT).show()
             }
         }
@@ -150,6 +152,7 @@ class MainActivity : AppCompatActivity() {
             val name = findViewById<EditText>(R.id.editMacroName).text.toString()
             if (name.isNotBlank()) {
                 pendingTemplateName = name
+                Toast.makeText(this, "Please grant screen capture permission if prompted.", Toast.LENGTH_LONG).show()
                 ScreenCaptureUtil.requestScreenCapture(this)
             } else {
                 Toast.makeText(this, "Enter macro/template name first", Toast.LENGTH_SHORT).show()
@@ -168,11 +171,13 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnTestTemplate).setOnClickListener {
             selectedTemplate?.let { name ->
                 pendingTestTemplate = name
+                Toast.makeText(this, "Please grant screen capture permission if prompted.", Toast.LENGTH_LONG).show()
                 ScreenCaptureUtil.requestScreenCapture(this)
             }
         }
         findViewById<Button>(R.id.btnTestOCR).setOnClickListener {
             pendingOCR = true
+            Toast.makeText(this, "Please grant screen capture permission if prompted.", Toast.LENGTH_LONG).show()
             ScreenCaptureUtil.requestScreenCapture(this)
         }
         findViewById<Button>(R.id.btnCorrectionsManager).setOnClickListener {
@@ -184,9 +189,10 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (pendingTemplateName != null) {
             ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
-                bitmap?.let {
-                    // Stub: use full screen as template
-                    TemplateStorage.saveTemplate(this, pendingTemplateName!!, it)
+                if (bitmap == null) {
+                    Toast.makeText(this, "Screen capture failed or permission denied.", Toast.LENGTH_SHORT).show()
+                } else {
+                    TemplateStorage.saveTemplate(this, pendingTemplateName!!, bitmap)
                     refreshTemplateList()
                     Toast.makeText(this, "Template captured", Toast.LENGTH_SHORT).show()
                 }
@@ -194,10 +200,12 @@ class MainActivity : AppCompatActivity() {
             }
         } else if (pendingTestTemplate != null) {
             ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
-                bitmap?.let {
+                if (bitmap == null) {
+                    Toast.makeText(this, "Screen capture failed or permission denied.", Toast.LENGTH_SHORT).show()
+                } else {
                     val template = TemplateStorage.loadTemplate(this, pendingTestTemplate!!)
                     if (template != null) {
-                        val match = ScreenRecognizer.matchTemplate(it, template)
+                        val match = ScreenRecognizer.matchTemplate(bitmap, template)
                         Toast.makeText(this, "Template match: $match", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -205,9 +213,11 @@ class MainActivity : AppCompatActivity() {
             }
         } else if (pendingOCR) {
             ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
-                bitmap?.let {
+                if (bitmap == null) {
+                    Toast.makeText(this, "Screen capture failed or permission denied.", Toast.LENGTH_SHORT).show()
+                } else {
                     ScreenRecognizer.initTesseract(this)
-                    val text = ScreenRecognizer.recognizeText(it)
+                    val text = ScreenRecognizer.recognizeText(bitmap)
                     Toast.makeText(this, "OCR: $text", Toast.LENGTH_LONG).show()
                 }
                 pendingOCR = false

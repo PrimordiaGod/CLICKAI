@@ -16,6 +16,7 @@ import com.clickai.macroapp.corrections.CorrectionDialog
 import android.graphics.Bitmap
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import com.clickai.macroapp.macro.engine.MacroRecorder
 
 class ScriptingEngine(private val player: MacroPlayer, private val recorder: MacroRecorder) {
     suspend fun runScriptWithVision(
@@ -59,27 +60,22 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                                 actions.addAll(correction.actions)
                                 continue
                             } else {
-                                // Show correction dialog and record/save correction
+                                val correctionRecorder = MacroRecorder()
                                 val userActions = withContext(Dispatchers.Main) {
                                     suspendCancellableCoroutine<List<MacroAction>?> { cont ->
                                         CorrectionDialog.show(
                                             activity,
                                             bitmap,
                                             ocrResult,
-                                            onRecord = { croppedBitmap ->
-                                                // Start MacroRecorder in correction mode (not shown here)
-                                                // For demo, just resume
-                                                cont.resume(null)
-                                            },
-                                            onSave = { name, desc, croppedBitmap ->
-                                                // For demo, use empty actions; in real app, use recorded actions
+                                            onRecord = { _ -> correctionRecorder.clear() },
+                                            onSave = { name, desc, _, recordedActions ->
                                                 val event = CorrectionEvent(
                                                     id = key,
                                                     type = "text",
                                                     signature = key,
-                                                    screenshotPath = null, // Save croppedBitmap if needed
+                                                    screenshotPath = null,
                                                     ocrResult = ocrResult,
-                                                    actions = listOf(), // Use recorded actions
+                                                    actions = recordedActions,
                                                     name = name,
                                                     description = desc
                                                 )
@@ -113,21 +109,22 @@ class ScriptingEngine(private val player: MacroPlayer, private val recorder: Mac
                                 actions.addAll(correction.actions)
                                 continue
                             } else {
+                                val correctionRecorder = MacroRecorder()
                                 val userActions = withContext(Dispatchers.Main) {
                                     suspendCancellableCoroutine<List<MacroAction>?> { cont ->
                                         CorrectionDialog.show(
                                             activity,
                                             bitmap,
                                             null,
-                                            onRecord = { croppedBitmap -> cont.resume(null) },
-                                            onSave = { name, desc, croppedBitmap ->
+                                            onRecord = { _ -> correctionRecorder.clear() },
+                                            onSave = { name, desc, _, recordedActions ->
                                                 val event = CorrectionEvent(
                                                     id = key,
                                                     type = "template",
                                                     signature = key,
                                                     screenshotPath = null,
                                                     ocrResult = null,
-                                                    actions = listOf(),
+                                                    actions = recordedActions,
                                                     name = name,
                                                     description = desc
                                                 )

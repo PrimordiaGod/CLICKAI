@@ -14,6 +14,8 @@ import android.net.Uri
 import android.provider.MediaStore
 import java.io.File
 import android.app.Activity
+import com.clickai.macroapp.macro.engine.MacroRecorder
+import android.widget.Toast
 
 object CorrectionDialog {
     fun show(
@@ -21,7 +23,7 @@ object CorrectionDialog {
         screenshot: Bitmap?,
         ocrResult: String?,
         onRecord: (croppedBitmap: Bitmap?) -> Unit,
-        onSave: (name: String, desc: String, croppedBitmap: Bitmap?) -> Unit,
+        onSave: (name: String, desc: String, croppedBitmap: Bitmap?, actions: List<MacroAction>) -> Unit,
         onCancel: () -> Unit
     ) {
         val inflater = LayoutInflater.from(context)
@@ -31,10 +33,11 @@ object CorrectionDialog {
         val nameEdit = view.findViewById<EditText>(R.id.correctionName)
         val descEdit = view.findViewById<EditText>(R.id.correctionDesc)
         var croppedBitmap: Bitmap? = screenshot
+        var correctionRecorder: MacroRecorder? = null
         if (screenshot != null) imageView.setImageBitmap(screenshot)
         ocrText.text = ocrResult ?: ""
         imageView.setOnClickListener {
-            // Start cropping
+            // Start cropping (unchanged)
             val tempFile = File(context.cacheDir, "correction_crop.png")
             val uri = Uri.fromFile(tempFile)
             val outUri = Uri.fromFile(File(context.cacheDir, "correction_crop_out.png"))
@@ -44,10 +47,15 @@ object CorrectionDialog {
         AlertDialog.Builder(context)
             .setTitle("Record Correction")
             .setView(view)
-            .setPositiveButton("Record") { _, _ -> onRecord(croppedBitmap) }
+            .setPositiveButton("Record") { _, _ ->
+                correctionRecorder = MacroRecorder()
+                Toast.makeText(context, "Correction recording started. Perform the correction gesture(s).", Toast.LENGTH_LONG).show()
+                onRecord(croppedBitmap)
+            }
             .setNegativeButton("Cancel") { _, _ -> onCancel() }
             .setNeutralButton("Save") { _, _ ->
-                onSave(nameEdit.text.toString(), descEdit.text.toString(), croppedBitmap)
+                val actions = correctionRecorder?.getActions() ?: emptyList()
+                onSave(nameEdit.text.toString(), descEdit.text.toString(), croppedBitmap, actions)
             }
             .show()
     }
