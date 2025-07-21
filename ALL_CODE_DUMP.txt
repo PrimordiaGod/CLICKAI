@@ -1,0 +1,1488 @@
+--- ALL PROJECT CODE DUMP ---
+\n\n===== app/src/main/AndroidManifest.xml =====\n
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        <activity android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".macro.engine.MacroAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+    </application>
+
+    <!-- Permissions for macro automation and screen recognition will be added here -->
+
+</manifest>\n\n===== app/src/main/java/com/clickai/macroapp/corrections/CorrectionDialog.kt =====\n
+package com.clickai.macroapp.corrections
+
+import android.app.AlertDialog
+import android.content.Context
+import android.graphics.Bitmap
+import android.view.LayoutInflater
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.TextView
+import com.clickai.macroapp.macro.engine.MacroAction
+import com.clickai.macroapp.R
+import com.yalantis.ucrop.UCrop
+import android.net.Uri
+import android.provider.MediaStore
+import java.io.File
+import android.app.Activity
+import com.clickai.macroapp.macro.engine.MacroRecorder
+import android.widget.Toast
+
+object CorrectionDialog {
+    fun show(
+        context: Activity,
+        screenshot: Bitmap?,
+        ocrResult: String?,
+        onRecord: (croppedBitmap: Bitmap?) -> Unit,
+        onSave: (name: String, desc: String, croppedBitmap: Bitmap?, actions: List<MacroAction>) -> Unit,
+        onCancel: () -> Unit
+    ) {
+        val inflater = LayoutInflater.from(context)
+        val view = inflater.inflate(R.layout.dialog_correction, null)
+        val imageView = view.findViewById<ImageView>(R.id.correctionScreenshot)
+        val ocrText = view.findViewById<TextView>(R.id.correctionOcrText)
+        val nameEdit = view.findViewById<EditText>(R.id.correctionName)
+        val descEdit = view.findViewById<EditText>(R.id.correctionDesc)
+        var croppedBitmap: Bitmap? = screenshot
+        var correctionRecorder: MacroRecorder? = null
+        if (screenshot != null) imageView.setImageBitmap(screenshot)
+        ocrText.text = ocrResult ?: ""
+        imageView.setOnClickListener {
+            // Start cropping (unchanged)
+            val tempFile = File(context.cacheDir, "correction_crop.png")
+            val uri = Uri.fromFile(tempFile)
+            val outUri = Uri.fromFile(File(context.cacheDir, "correction_crop_out.png"))
+            MediaStore.Images.Media.insertImage(context.contentResolver, screenshot, "correction_crop", null)
+            UCrop.of(uri, outUri).start(context)
+        }
+        AlertDialog.Builder(context)
+            .setTitle("Record Correction")
+            .setView(view)
+            .setPositiveButton("Record") { _, _ ->
+                correctionRecorder = MacroRecorder()
+                Toast.makeText(context, "Correction recording started. Perform the correction gesture(s).", Toast.LENGTH_LONG).show()
+                onRecord(croppedBitmap)
+            }
+            .setNegativeButton("Cancel") { _, _ -> onCancel() }
+            .setNeutralButton("Save") { _, _ ->
+                val actions = correctionRecorder?.getActions() ?: emptyList()
+                onSave(nameEdit.text.toString(), descEdit.text.toString(), croppedBitmap, actions)
+            }
+            .show()
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/corrections/CorrectionsManagerActivity.kt =====\n
+package com.clickai.macroapp.corrections
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.view.View
+import android.widget.*
+import com.clickai.macroapp.R
+import com.clickai.macroapp.macro.engine.CorrectionStorage
+import com.clickai.macroapp.macro.engine.CorrectionEvent
+
+class CorrectionsManagerActivity : Activity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_corrections_manager)
+        val listView = findViewById<ListView>(R.id.correctionsList)
+        val corrections = CorrectionStorage.getAll(this)
+        val adapter = CorrectionsAdapter(this, corrections)
+        listView.adapter = adapter
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val event = corrections[position]
+            showCorrectionDetail(event)
+        }
+    }
+
+    private fun showCorrectionDetail(event: CorrectionEvent) {
+        val builder = android.app.AlertDialog.Builder(this)
+        val view = layoutInflater.inflate(R.layout.dialog_correction, null)
+        val imageView = view.findViewById<ImageView>(R.id.correctionScreenshot)
+        val ocrText = view.findViewById<TextView>(R.id.correctionOcrText)
+        val nameEdit = view.findViewById<EditText>(R.id.correctionName)
+        val descEdit = view.findViewById<EditText>(R.id.correctionDesc)
+        if (event.screenshotPath != null) {
+            val bmp = BitmapFactory.decodeFile(event.screenshotPath)
+            imageView.setImageBitmap(bmp)
+        }
+        ocrText.text = event.ocrResult ?: ""
+        nameEdit.setText(event.name)
+        descEdit.setText(event.description)
+        builder.setTitle("Correction Detail")
+            .setView(view)
+            .setPositiveButton("Replay") { _, _ ->
+                // TODO: Replay correction actions in context
+                Toast.makeText(this, "Replay not implemented in this demo.", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Delete") { _, _ ->
+                CorrectionStorage.deleteCorrection(this, event.id)
+                Toast.makeText(this, "Correction deleted", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+            .setNeutralButton("Close", null)
+            .show()
+    }
+}
+
+class CorrectionsAdapter(context: Context, private val corrections: List<CorrectionEvent>) : BaseAdapter() {
+    private val inflater = LayoutInflater.from(context)
+    override fun getCount() = corrections.size
+    override fun getItem(position: Int) = corrections[position]
+    override fun getItemId(position: Int) = position.toLong()
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        val view = convertView ?: inflater.inflate(R.layout.correction_list_item, parent, false)
+        val event = corrections[position]
+        val nameView = view.findViewById<TextView>(R.id.correctionListName)
+        val descView = view.findViewById<TextView>(R.id.correctionListDesc)
+        val typeView = view.findViewById<TextView>(R.id.correctionListType)
+        nameView.text = event.name
+        descView.text = event.description
+        typeView.text = event.type
+        return view
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/macro/engine/CorrectionStorage.kt =====\n
+package com.clickai.macroapp.macro.engine
+
+import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.io.File
+
+// Correction event data model
+// type: "text", "template", "image"
+// signature: e.g., text string, template name, or image hash
+// screenshotPath: for preview
+// ocrResult: for preview
+// name/description: user-provided
+
+data class CorrectionEvent(
+    val id: String, // type:signature
+    val type: String,
+    val signature: String,
+    val screenshotPath: String? = null,
+    val ocrResult: String? = null,
+    val actions: List<MacroAction>,
+    val name: String = "",
+    val description: String = ""
+)
+
+object CorrectionStorage {
+    private val gson = Gson()
+    private fun file(context: Context) = File(context.filesDir, "corrections.json")
+
+    fun saveCorrection(context: Context, event: CorrectionEvent) {
+        val all = loadAll(context).toMutableList()
+        all.removeAll { it.id == event.id }
+        all.add(event)
+        file(context).writeText(gson.toJson(all))
+    }
+
+    fun getCorrection(context: Context, id: String): CorrectionEvent? {
+        return loadAll(context).find { it.id == id }
+    }
+
+    fun getAll(context: Context): List<CorrectionEvent> = loadAll(context)
+
+    fun deleteCorrection(context: Context, id: String) {
+        val all = loadAll(context).toMutableList()
+        all.removeAll { it.id == id }
+        file(context).writeText(gson.toJson(all))
+    }
+
+    private fun loadAll(context: Context): List<CorrectionEvent> {
+        val f = file(context)
+        if (!f.exists()) return emptyList()
+        val type = object : TypeToken<List<CorrectionEvent>>() {}.type
+        return gson.fromJson(f.readText(), type)
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/macro/engine/MacroAccessibilityService.kt =====\n
+package com.clickai.macroapp.macro.engine
+
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.view.accessibility.AccessibilityEvent
+import android.graphics.Path
+import android.util.Log
+
+class MacroAccessibilityService : AccessibilityService() {
+    companion object {
+        var instance: MacroAccessibilityService? = null
+        var recorder: MacroRecorder? = null
+        var recording: Boolean = false
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+        if (recorder == null) recorder = MacroRecorder()
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // For demo: record tap events (TYPE_TOUCH_INTERACTION_START)
+        if (recording && event != null && event.eventType == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START) {
+            val node = event.source ?: return
+            val bounds = android.graphics.Rect()
+            node.getBoundsInScreen(bounds)
+            val x = bounds.centerX().toFloat()
+            val y = bounds.centerY().toFloat()
+            recorder?.recordTap(x, y)
+            Log.d("MacroService", "Recorded tap at $x,$y")
+        }
+    }
+
+    override fun onInterrupt() {
+        // Handle service interruption
+    }
+
+    fun performTap(x: Float, y: Float) {
+        val path = Path().apply { moveTo(x, y) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .build()
+        dispatchGesture(gesture, null, null)
+    }
+
+    fun performSwipe(x1: Float, y1: Float, x2: Float, y2: Float, duration: Long = 300) {
+        val path = Path().apply {
+            moveTo(x1, y1)
+            lineTo(x2, y2)
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
+            .build()
+        dispatchGesture(gesture, null, null)
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/macro/engine/MacroPlayer.kt =====\n
+package com.clickai.macroapp.macro.engine
+
+import kotlinx.coroutines.*
+
+class MacroPlayer(private val service: MacroAccessibilityService) {
+    private var job: Job? = null
+
+    fun play(actions: List<MacroAction>, onComplete: (() -> Unit)? = null) {
+        job = CoroutineScope(Dispatchers.Main).launch {
+            for (action in actions) {
+                when (action) {
+                    is MacroAction.Tap -> {
+                        delay(action.delay)
+                        service.performTap(action.x, action.y)
+                    }
+                    is MacroAction.Swipe -> {
+                        delay(action.delay)
+                        service.performSwipe(action.x1, action.y1, action.x2, action.y2, action.duration)
+                    }
+                    is MacroAction.Wait -> {
+                        delay(action.duration)
+                    }
+                    is MacroAction.Loop -> {
+                        for (i in 0 until action.count) {
+                            for (j in action.startIndex..action.endIndex) {
+                                val loopAction = actions.getOrNull(j) ?: continue
+                                when (loopAction) {
+                                    is MacroAction.Tap -> service.performTap(loopAction.x, loopAction.y)
+                                    is MacroAction.Swipe -> service.performSwipe(loopAction.x1, loopAction.y1, loopAction.x2, loopAction.y2, loopAction.duration)
+                                    is MacroAction.Wait -> delay(loopAction.duration)
+                                    else -> {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            onComplete?.invoke()
+        }
+    }
+
+    fun stop() {
+        job?.cancel()
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/macro/engine/MacroRecorder.kt =====\n
+package com.clickai.macroapp.macro.engine
+
+import android.view.accessibility.AccessibilityEvent
+
+// Data class for a macro action
+sealed class MacroAction {
+    data class Tap(val x: Float, val y: Float, val delay: Long = 0) : MacroAction()
+    data class Swipe(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val duration: Long = 300, val delay: Long = 0) : MacroAction()
+    data class Wait(val duration: Long) : MacroAction()
+    data class Loop(val startIndex: Int, val endIndex: Int, val count: Int) : MacroAction()
+}
+
+class MacroRecorder {
+    private val actions = mutableListOf<MacroAction>()
+    private var lastEventTime: Long = 0
+
+    fun recordTap(x: Float, y: Float) {
+        val now = System.currentTimeMillis()
+        val delay = if (lastEventTime == 0L) 0 else now - lastEventTime
+        actions.add(MacroAction.Tap(x, y, delay))
+        lastEventTime = now
+    }
+
+    fun recordSwipe(x1: Float, y1: Float, x2: Float, y2: Float, duration: Long = 300) {
+        val now = System.currentTimeMillis()
+        val delay = if (lastEventTime == 0L) 0 else now - lastEventTime
+        actions.add(MacroAction.Swipe(x1, y1, x2, y2, duration, delay))
+        lastEventTime = now
+    }
+
+    fun recordWait(duration: Long) {
+        actions.add(MacroAction.Wait(duration))
+    }
+
+    fun getActions(): List<MacroAction> = actions.toList()
+    fun clear() {
+        actions.clear()
+        lastEventTime = 0
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/macro/engine/MacroStorage.kt =====\n
+package com.clickai.macroapp.macro.engine
+
+import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.io.File
+
+object MacroStorage {
+    private val gson = Gson()
+
+    fun saveMacro(context: Context, name: String, actions: List<MacroAction>) {
+        val json = gson.toJson(actions)
+        val file = File(context.filesDir, "$name.macro.json")
+        file.writeText(json)
+    }
+
+    fun loadMacro(context: Context, name: String): List<MacroAction> {
+        val file = File(context.filesDir, "$name.macro.json")
+        if (!file.exists()) return emptyList()
+        val json = file.readText()
+        val type = object : TypeToken<List<MacroAction>>() {}.type
+        return gson.fromJson(json, type)
+    }
+
+    fun listMacros(context: Context): List<String> {
+        return context.filesDir.listFiles()?.filter { it.name.endsWith(".macro.json") }?.map { it.name.removeSuffix(".macro.json") } ?: emptyList()
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/MainActivity.kt =====\n
+package com.clickai.macroapp
+
+import android.content.Context
+import android.os.Bundle
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import com.clickai.macroapp.macro.engine.*
+import android.app.AlertDialog
+import android.text.InputType
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.ViewPropertyAnimatorListenerAdapter
+import com.clickai.macroapp.scripting.*
+import com.clickai.macroapp.vision.*
+import android.content.Intent
+import android.graphics.Bitmap
+import com.clickai.macroapp.corrections.CorrectionsManagerActivity
+import com.google.android.material.snackbar.Snackbar
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+
+class MainActivity : AppCompatActivity() {
+    private val recorder = MacroRecorder()
+    private var player: MacroPlayer? = null
+    private lateinit var macroList: ListView
+    private lateinit var timelineList: ListView
+    private lateinit var adapter: ArrayAdapter<String>
+    private lateinit var timelineAdapter: TimelineAdapter
+    private var currentMacroName: String = ""
+    private lateinit var scriptList: ListView
+    private lateinit var scriptAdapter: ArrayAdapter<String>
+    private lateinit var editScript: EditText
+    private lateinit var scriptingEngine: ScriptingEngine
+    private lateinit var templateList: ListView
+    private lateinit var templateAdapter: ArrayAdapter<String>
+    private var selectedTemplate: String? = null
+    private var pendingTemplateName: String? = null
+    private var pendingTestTemplate: String? = null
+    private var pendingOCR: Boolean = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        macroList = findViewById(R.id.macroList)
+        timelineList = findViewById(R.id.timelineList)
+        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, MacroStorage.listMacros(this))
+        macroList.adapter = adapter
+        timelineAdapter = TimelineAdapter(this, recorder)
+        timelineList.adapter = timelineAdapter
+
+        scriptingEngine = ScriptingEngine(player ?: MacroPlayer(MacroAccessibilityService()), recorder)
+        scriptList = findViewById(R.id.scriptList)
+        scriptAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, ScriptStorage.listScripts(this))
+        scriptList.adapter = scriptAdapter
+        editScript = findViewById(R.id.editScript)
+        findViewById<Button>(R.id.btnRunScript).setOnClickListener {
+            lifecycleScope.launch {
+                scriptingEngine.runScriptWithVision(this@MainActivity, editScript.text.toString()) {
+                    Toast.makeText(this@MainActivity, "Script finished", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        findViewById<Button>(R.id.btnSaveScript).setOnClickListener {
+            val name = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (name.isNotBlank()) {
+                ScriptStorage.saveScript(this, name, editScript.text.toString())
+                refreshScriptList()
+                Toast.makeText(this, "Script saved", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnLoadScript).setOnClickListener {
+            val name = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (name.isNotBlank()) {
+                editScript.setText(ScriptStorage.loadScript(this, name))
+                Toast.makeText(this, "Script loaded", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnScriptHelp).setOnClickListener {
+            showScriptHelpDialog()
+        }
+        scriptList.setOnItemClickListener { _, _, position, _ ->
+            val scriptName = scriptAdapter.getItem(position) ?: return@setOnItemClickListener
+            findViewById<EditText>(R.id.editMacroName).setText(scriptName)
+        }
+
+        findViewById<Button>(R.id.btnRecord).setOnClickListener {
+            MacroAccessibilityService.recorder?.clear()
+            MacroAccessibilityService.recording = true
+            Toast.makeText(this, "Recording started. Use gestures in the app.", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.btnPlay).setOnClickListener {
+            MacroAccessibilityService.recording = false
+            val service = MacroAccessibilityService.instance
+            val player = if (service != null) MacroPlayer(service) else null
+            player?.play(MacroAccessibilityService.recorder?.getActions() ?: emptyList()) {
+                Toast.makeText(this, "Playback finished", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnSave).setOnClickListener {
+            val macroName = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (macroName.isNotBlank()) {
+                MacroStorage.saveMacro(this, macroName, recorder.getActions())
+                refreshMacroList()
+                Toast.makeText(this, "Macro saved", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnLoad).setOnClickListener {
+            val macroName = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (macroName.isNotBlank()) {
+                val actions = MacroStorage.loadMacro(this, macroName)
+                recorder.clear()
+                actions.forEach {
+                    when (it) {
+                        is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
+                        is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
+                        is MacroAction.Wait -> recorder.recordWait(it.duration)
+                        is MacroAction.Loop -> {} // Already added
+                    }
+                }
+                refreshTimeline()
+                Toast.makeText(this, "Macro loaded", Toast.LENGTH_SHORT).show()
+            }
+        }
+        macroList.setOnItemClickListener { _, _, position, _ ->
+            val macroName = adapter.getItem(position) ?: return@setOnItemClickListener
+            findViewById<EditText>(R.id.editMacroName).setText(macroName)
+        }
+        timelineList.setOnItemClickListener { _, _, position, _ ->
+            showEditActionDialog(position)
+        }
+        refreshTimeline()
+        val loopBtn = Button(this)
+        loopBtn.text = "Add Loop"
+        loopBtn.setOnClickListener { showAddLoopDialog() }
+        val layout = findViewById<LinearLayout>(R.id.mainLayout)
+        layout.addView(loopBtn, 2) // Insert after macro controls
+
+        templateList = findViewById(R.id.templateList)
+        templateAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, TemplateStorage.listTemplates(this))
+        templateList.adapter = templateAdapter
+        templateList.setOnItemClickListener { _, _, position, _ ->
+            selectedTemplate = templateAdapter.getItem(position)
+        }
+        findViewById<Button>(R.id.btnCaptureTemplate).setOnClickListener {
+            val name = findViewById<EditText>(R.id.editMacroName).text.toString()
+            if (name.isNotBlank()) {
+                pendingTemplateName = name
+                Toast.makeText(this, "Please grant screen capture permission if prompted.", Toast.LENGTH_LONG).show()
+                ScreenCaptureUtil.requestScreenCapture(this)
+            } else {
+                Toast.makeText(this, "Enter macro/template name first", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnUploadTemplate).setOnClickListener {
+            Toast.makeText(this, "Upload not implemented in this stub.", Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.btnDeleteTemplate).setOnClickListener {
+            selectedTemplate?.let {
+                TemplateStorage.deleteTemplate(this, it)
+                refreshTemplateList()
+                Toast.makeText(this, "Template deleted", Toast.LENGTH_SHORT).show()
+            }
+        }
+        findViewById<Button>(R.id.btnTestTemplate).setOnClickListener {
+            selectedTemplate?.let { name ->
+                pendingTestTemplate = name
+                Toast.makeText(this, "Please grant screen capture permission if prompted.", Toast.LENGTH_LONG).show()
+                ScreenCaptureUtil.requestScreenCapture(this)
+            }
+        }
+        findViewById<Button>(R.id.btnTestOCR).setOnClickListener {
+            pendingOCR = true
+            Toast.makeText(this, "Please grant screen capture permission if prompted.", Toast.LENGTH_LONG).show()
+            ScreenCaptureUtil.requestScreenCapture(this)
+        }
+        findViewById<Button>(R.id.btnCorrectionsManager).setOnClickListener {
+            startActivity(Intent(this, CorrectionsManagerActivity::class.java))
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (pendingTemplateName != null) {
+            ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
+                if (bitmap == null) {
+                    Toast.makeText(this, "Screen capture failed or permission denied.", Toast.LENGTH_SHORT).show()
+                } else {
+                    TemplateStorage.saveTemplate(this, pendingTemplateName!!, bitmap)
+                    refreshTemplateList()
+                    Toast.makeText(this, "Template captured", Toast.LENGTH_SHORT).show()
+                }
+                pendingTemplateName = null
+            }
+        } else if (pendingTestTemplate != null) {
+            ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
+                if (bitmap == null) {
+                    Toast.makeText(this, "Screen capture failed or permission denied.", Toast.LENGTH_SHORT).show()
+                } else {
+                    val template = TemplateStorage.loadTemplate(this, pendingTestTemplate!!)
+                    if (template != null) {
+                        val match = ScreenRecognizer.matchTemplate(bitmap, template)
+                        Toast.makeText(this, "Template match: $match", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                pendingTestTemplate = null
+            }
+        } else if (pendingOCR) {
+            ScreenCaptureUtil.onActivityResult(this, requestCode, resultCode, data) { bitmap ->
+                if (bitmap == null) {
+                    Toast.makeText(this, "Screen capture failed or permission denied.", Toast.LENGTH_SHORT).show()
+                } else {
+                    ScreenRecognizer.initTesseract(this)
+                    val text = ScreenRecognizer.recognizeText(bitmap)
+                    Toast.makeText(this, "OCR: $text", Toast.LENGTH_LONG).show()
+                }
+                pendingOCR = false
+            }
+        }
+    }
+
+    private fun refreshMacroList() {
+        adapter.clear()
+        adapter.addAll(MacroStorage.listMacros(this))
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun refreshTimeline() {
+        timelineAdapter.notifyDataSetChanged()
+    }
+
+    private fun refreshScriptList() {
+        scriptAdapter.clear()
+        scriptAdapter.addAll(ScriptStorage.listScripts(this))
+        scriptAdapter.notifyDataSetChanged()
+    }
+
+    private fun refreshTemplateList() {
+        templateAdapter.clear()
+        templateAdapter.addAll(TemplateStorage.listTemplates(this))
+        templateAdapter.notifyDataSetChanged()
+    }
+
+    // --- Timeline Editing ---
+    private fun showEditActionDialog(position: Int) {
+        val actions = recorder.getActions().toMutableList()
+        val action = actions[position]
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Edit Action")
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.VERTICAL
+        val delayInput = EditText(this)
+        delayInput.inputType = InputType.TYPE_CLASS_NUMBER
+        delayInput.hint = "Delay (ms)"
+        when (action) {
+            is MacroAction.Tap -> delayInput.setText(action.delay.toString())
+            is MacroAction.Swipe -> delayInput.setText(action.delay.toString())
+            is MacroAction.Wait -> delayInput.setText(action.duration.toString())
+            is MacroAction.Loop -> {} // Already added
+        }
+        layout.addView(delayInput)
+        builder.setView(layout)
+        builder.setPositiveButton("Save") { _, _ ->
+            val delay = delayInput.text.toString().toLongOrNull() ?: 0L
+            when (action) {
+                is MacroAction.Tap -> actions[position] = action.copy(delay = delay)
+                is MacroAction.Swipe -> actions[position] = action.copy(delay = delay)
+                is MacroAction.Wait -> actions[position] = action.copy(duration = delay)
+                is MacroAction.Loop -> {} // Already added
+            }
+            recorder.clear()
+            actions.forEach {
+                when (it) {
+                    is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
+                    is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
+                    is MacroAction.Wait -> recorder.recordWait(it.duration)
+                    is MacroAction.Loop -> {} // Already added
+                }
+            }
+            refreshTimeline()
+        }
+        builder.setNegativeButton("Cancel", null)
+        builder.setNeutralButton("Delete") { _, _ ->
+            actions.removeAt(position)
+            recorder.clear()
+            actions.forEach {
+                when (it) {
+                    is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
+                    is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
+                    is MacroAction.Wait -> recorder.recordWait(it.duration)
+                    is MacroAction.Loop -> {} // Already added
+                }
+            }
+            refreshTimeline()
+        }
+        builder.show()
+    }
+
+    private fun showAddLoopDialog() {
+        val actions = recorder.getActions().toMutableList()
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Add Loop")
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.VERTICAL
+        val startInput = EditText(this)
+        startInput.inputType = InputType.TYPE_CLASS_NUMBER
+        startInput.hint = "Start index (0-based)"
+        val endInput = EditText(this)
+        endInput.inputType = InputType.TYPE_CLASS_NUMBER
+        endInput.hint = "End index (0-based)"
+        val countInput = EditText(this)
+        countInput.inputType = InputType.TYPE_CLASS_NUMBER
+        countInput.hint = "Repeat count"
+        layout.addView(startInput)
+        layout.addView(endInput)
+        layout.addView(countInput)
+        builder.setView(layout)
+        builder.setPositiveButton("Add") { _, _ ->
+            val start = startInput.text.toString().toIntOrNull() ?: 0
+            val end = endInput.text.toString().toIntOrNull() ?: 0
+            val count = countInput.text.toString().toIntOrNull() ?: 1
+            actions.add(MacroAction.Loop(start, end, count))
+            recorder.clear()
+            actions.forEach {
+                when (it) {
+                    is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
+                    is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
+                    is MacroAction.Wait -> recorder.recordWait(it.duration)
+                    is MacroAction.Loop -> {} // Already added
+                }
+            }
+            refreshTimeline()
+        }
+        builder.setNegativeButton("Cancel", null)
+        builder.show()
+    }
+
+    private fun showScriptHelpDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Scripting API Help")
+            .setMessage("""Available APIs:\n- tap(x, y)\n- swipe(x1, y1, x2, y2, duration)\n- wait(ms)\n- loop(startIndex, endIndex, count)\n""")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun showSnackbar(message: String, undo: (() -> Unit)? = null) {
+        val rootView = findViewById<View>(android.R.id.content)
+        val snackbar = Snackbar.make(rootView, message, Snackbar.LENGTH_LONG)
+        if (undo != null) {
+            snackbar.setAction("Undo") { undo() }
+        }
+        snackbar.show()
+    }
+}
+
+class TimelineAdapter(private val context: Context, private val recorder: MacroRecorder) : BaseAdapter() {
+    override fun getCount(): Int = recorder.getActions().size
+    override fun getItem(position: Int): Any = recorder.getActions()[position]
+    override fun getItemId(position: Int): Long = position.toLong()
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+        val action = recorder.getActions()[position]
+        val layout = LinearLayout(context)
+        layout.orientation = LinearLayout.HORIZONTAL
+        val text = TextView(context)
+        text.text = action.toString()
+        layout.addView(text, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val upBtn = ImageButton(context)
+        upBtn.setImageResource(android.R.drawable.arrow_up_float)
+        upBtn.setOnClickListener {
+            if (position > 0) {
+                swapActions(position, position - 1)
+            }
+        }
+        layout.addView(upBtn)
+        val downBtn = ImageButton(context)
+        downBtn.setImageResource(android.R.drawable.arrow_down_float)
+        downBtn.setOnClickListener {
+            if (position < recorder.getActions().size - 1) {
+                swapActions(position, position + 1)
+            }
+        }
+        layout.addView(downBtn)
+        return layout
+    }
+    private fun swapActions(pos1: Int, pos2: Int) {
+        val actions = recorder.getActions().toMutableList()
+        val tmp = actions[pos1]
+        actions[pos1] = actions[pos2]
+        actions[pos2] = tmp
+        recorder.clear()
+        actions.forEach {
+            when (it) {
+                is MacroAction.Tap -> recorder.recordTap(it.x, it.y)
+                is MacroAction.Swipe -> recorder.recordSwipe(it.x1, it.y1, it.x2, it.y2, it.duration)
+                is MacroAction.Wait -> recorder.recordWait(it.duration)
+                is MacroAction.Loop -> {} // Already added
+            }
+        }
+        notifyDataSetChanged()
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/scripting/ScriptingEngine.kt =====\n
+package com.clickai.macroapp.scripting
+
+import com.clickai.macroapp.macro.engine.*
+import kotlin.script.experimental.api.*
+import kotlin.script.experimental.host.StringScriptSource
+import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
+import com.clickai.macroapp.vision.ScreenCaptureUtil
+import com.clickai.macroapp.vision.ScreenRecognizer
+import com.clickai.macroapp.vision.TemplateStorage
+import android.app.Activity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.clickai.macroapp.macro.engine.CorrectionStorage
+import com.clickai.macroapp.macro.engine.CorrectionEvent
+import com.clickai.macroapp.corrections.CorrectionDialog
+import android.graphics.Bitmap
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import com.clickai.macroapp.macro.engine.MacroRecorder
+
+class ScriptingEngine(private val player: MacroPlayer, private val recorder: MacroRecorder) {
+    suspend fun runScriptWithVision(
+        activity: Activity,
+        script: String,
+        onComplete: (() -> Unit)? = null,
+        onPause: ((String) -> Unit)? = null
+    ) {
+        val lines = script.lines()
+        val actions = mutableListOf<MacroAction>()
+        for (line in lines) {
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("tap(") -> {
+                    val args = trimmed.removePrefix("tap(").removeSuffix(")").split(",").map { it.trim().toFloat() }
+                    actions.add(MacroAction.Tap(args[0], args[1]))
+                }
+                trimmed.startsWith("swipe(") -> {
+                    val args = trimmed.removePrefix("swipe(").removeSuffix(")").split(",").map { it.trim().toFloat() }
+                    actions.add(MacroAction.Swipe(args[0], args[1], args[2], args[3], args.getOrNull(4)?.toLong() ?: 300))
+                }
+                trimmed.startsWith("wait(") -> {
+                    val ms = trimmed.removePrefix("wait(").removeSuffix(")").toLong()
+                    actions.add(MacroAction.Wait(ms))
+                }
+                trimmed.startsWith("loop(") -> {
+                    val args = trimmed.removePrefix("loop(").removeSuffix(")").split(",").map { it.trim().toInt() }
+                    actions.add(MacroAction.Loop(args[0], args[1], args[2]))
+                }
+                trimmed.startsWith("recognizeText(") -> {
+                    val text = trimmed.removePrefix("recognizeText(").removeSuffix(")").trim('"')
+                    val key = "text:$text"
+                    val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
+                    if (bitmap != null) {
+                        ScreenRecognizer.initTesseract(activity)
+                        val ocrResult = ScreenRecognizer.recognizeText(bitmap)
+                        val found = ocrResult.contains(text, ignoreCase = true)
+                        if (!found) {
+                            val correction = CorrectionStorage.getCorrection(activity, key)
+                            if (correction != null) {
+                                actions.addAll(correction.actions)
+                                continue
+                            } else {
+                                val correctionRecorder = MacroRecorder()
+                                val userActions = withContext(Dispatchers.Main) {
+                                    suspendCancellableCoroutine<List<MacroAction>?> { cont ->
+                                        CorrectionDialog.show(
+                                            activity,
+                                            bitmap,
+                                            ocrResult,
+                                            onRecord = { _ -> correctionRecorder.clear() },
+                                            onSave = { name, desc, _, recordedActions ->
+                                                val event = CorrectionEvent(
+                                                    id = key,
+                                                    type = "text",
+                                                    signature = key,
+                                                    screenshotPath = null,
+                                                    ocrResult = ocrResult,
+                                                    actions = recordedActions,
+                                                    name = name,
+                                                    description = desc
+                                                )
+                                                CorrectionStorage.saveCorrection(activity, event)
+                                                cont.resume(event.actions)
+                                            },
+                                            onCancel = { cont.resume(null) }
+                                        )
+                                    }
+                                }
+                                if (userActions != null) {
+                                    actions.addAll(userActions)
+                                    continue
+                                }
+                                onPause?.invoke("Text '$text' not found. Macro paused.")
+                                return
+                            }
+                        }
+                    }
+                }
+                trimmed.startsWith("matchTemplate(") -> {
+                    val name = trimmed.removePrefix("matchTemplate(").removeSuffix(")").trim('"')
+                    val key = "template:$name"
+                    val bitmap = withContext(Dispatchers.Main) { captureScreenSuspend(activity) }
+                    val template = TemplateStorage.loadTemplate(activity, name)
+                    if (bitmap != null && template != null) {
+                        val found = ScreenRecognizer.matchTemplate(bitmap, template)
+                        if (!found) {
+                            val correction = CorrectionStorage.getCorrection(activity, key)
+                            if (correction != null) {
+                                actions.addAll(correction.actions)
+                                continue
+                            } else {
+                                val correctionRecorder = MacroRecorder()
+                                val userActions = withContext(Dispatchers.Main) {
+                                    suspendCancellableCoroutine<List<MacroAction>?> { cont ->
+                                        CorrectionDialog.show(
+                                            activity,
+                                            bitmap,
+                                            null,
+                                            onRecord = { _ -> correctionRecorder.clear() },
+                                            onSave = { name, desc, _, recordedActions ->
+                                                val event = CorrectionEvent(
+                                                    id = key,
+                                                    type = "template",
+                                                    signature = key,
+                                                    screenshotPath = null,
+                                                    ocrResult = null,
+                                                    actions = recordedActions,
+                                                    name = name,
+                                                    description = desc
+                                                )
+                                                CorrectionStorage.saveCorrection(activity, event)
+                                                cont.resume(event.actions)
+                                            },
+                                            onCancel = { cont.resume(null) }
+                                        )
+                                    }
+                                }
+                                if (userActions != null) {
+                                    actions.addAll(userActions)
+                                    continue
+                                }
+                                onPause?.invoke("Template '$name' not found. Macro paused.")
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        player.play(actions, onComplete)
+    }
+}
+
+suspend fun captureScreenSuspend(activity: Activity): android.graphics.Bitmap? = null // Not implemented in CI stub\n\n===== app/src/main/java/com/clickai/macroapp/scripting/ScriptStorage.kt =====\n
+package com.clickai.macroapp.scripting
+
+import android.content.Context
+import java.io.File
+
+object ScriptStorage {
+    fun saveScript(context: Context, name: String, code: String) {
+        val file = File(context.filesDir, "$name.script.kts")
+        file.writeText(code)
+    }
+
+    fun loadScript(context: Context, name: String): String {
+        val file = File(context.filesDir, "$name.script.kts")
+        return if (file.exists()) file.readText() else ""
+    }
+
+    fun listScripts(context: Context): List<String> {
+        return context.filesDir.listFiles()?.filter { it.name.endsWith(".script.kts") }?.map { it.name.removeSuffix(".script.kts") } ?: emptyList()
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/vision/ImageHashUtil.kt =====\n
+package com.clickai.macroapp.vision
+
+import android.graphics.Bitmap
+import android.graphics.Color
+import java.security.MessageDigest
+
+object ImageHashUtil {
+    // Simple average hash (aHash) for demo; can be replaced with pHash
+    fun averageHash(bitmap: Bitmap): String {
+        val size = 8
+        val resized = Bitmap.createScaledBitmap(bitmap, size, size, false)
+        var sum = 0L
+        val pixels = IntArray(size * size)
+        resized.getPixels(pixels, 0, size, 0, 0, size, size)
+        for (p in pixels) sum += Color.red(p) + Color.green(p) + Color.blue(p)
+        val avg = sum / (size * size * 3)
+        val hash = StringBuilder()
+        for (p in pixels) {
+            val v = (Color.red(p) + Color.green(p) + Color.blue(p)) / 3
+            hash.append(if (v > avg) '1' else '0')
+        }
+        return hash.toString()
+    }
+
+    fun sha256(input: String): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        val bytes = md.digest(input.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/vision/ScreenCaptureUtil.kt =====\n
+package com.clickai.macroapp.vision
+
+import android.app.Activity
+import android.app.Activity.RESULT_OK
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
+import android.media.ImageReader
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
+import android.os.Handler
+import android.os.Looper
+import android.util.DisplayMetrics
+import android.view.WindowManager
+
+object ScreenCaptureUtil {
+    private const val REQUEST_CODE = 1001
+    private var mediaProjection: MediaProjection? = null
+    private var virtualDisplay: VirtualDisplay? = null
+    private var imageReader: ImageReader? = null
+
+    fun requestScreenCapture(activity: Activity) {
+        val projectionManager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val intent = projectionManager.createScreenCaptureIntent()
+        activity.startActivityForResult(intent, REQUEST_CODE)
+    }
+
+    fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?, onCaptured: (Bitmap?) -> Unit) {
+        if (requestCode == REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            val projectionManager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            mediaProjection = projectionManager.getMediaProjection(resultCode, data)
+            captureScreen(activity, onCaptured)
+        } else {
+            onCaptured(null)
+        }
+    }
+
+    private fun captureScreen(activity: Activity, onCaptured: (Bitmap?) -> Unit) {
+        val windowManager = activity.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val metrics = DisplayMetrics()
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        val width = metrics.widthPixels
+        val height = metrics.heightPixels
+        val density = metrics.densityDpi
+        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+        virtualDisplay = mediaProjection?.createVirtualDisplay(
+            "ScreenCapture",
+            width, height, density,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            imageReader?.surface, null, Handler(Looper.getMainLooper())
+        )
+        Handler(Looper.getMainLooper()).postDelayed({
+            val image = imageReader?.acquireLatestImage()
+            if (image != null) {
+                val planes = image.planes
+                val buffer = planes[0].buffer
+                val pixelStride = planes[0].pixelStride
+                val rowStride = planes[0].rowStride
+                val rowPadding = rowStride - pixelStride * width
+                val bitmap = Bitmap.createBitmap(
+                    width + rowPadding / pixelStride,
+                    height, Bitmap.Config.ARGB_8888
+                )
+                bitmap.copyPixelsFromBuffer(buffer)
+                image.close()
+                onCaptured(bitmap)
+            } else {
+                onCaptured(null)
+            }
+            release()
+        }, 500)
+    }
+
+    private fun release() {
+        virtualDisplay?.release()
+        imageReader?.close()
+        mediaProjection?.stop()
+        virtualDisplay = null
+        imageReader = null
+        mediaProjection = null
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/vision/ScreenRecognizer.kt =====\n
+package com.clickai.macroapp.vision
+
+import android.content.Context
+import android.graphics.Bitmap
+import com.googlecode.tesseract.android.TessBaseAPI
+
+object ScreenRecognizer {
+    private var tessBaseAPI: TessBaseAPI? = null
+
+    fun initTesseract(context: Context, lang: String = "eng") {
+        if (tessBaseAPI == null) {
+            tessBaseAPI = TessBaseAPI()
+            val dir = context.getExternalFilesDir(null)?.absolutePath ?: context.filesDir.absolutePath
+            tessBaseAPI?.init(dir, lang)
+        }
+    }
+
+    fun recognizeText(bitmap: Bitmap): String {
+        tessBaseAPI?.setImage(bitmap)
+        return tessBaseAPI?.utF8Text ?: ""
+    }
+
+    fun matchTemplate(screen: Bitmap, template: Bitmap, threshold: Double = 0.9): Boolean {
+        // OpenCV not available; stub always returns false
+        return false
+    }
+}\n\n===== app/src/main/java/com/clickai/macroapp/vision/TemplateStorage.kt =====\n
+package com.clickai.macroapp.vision
+
+import android.content.Context
+import android.graphics.Bitmap
+import java.io.File
+import java.io.FileOutputStream
+
+object TemplateStorage {
+    fun saveTemplate(context: Context, name: String, bitmap: Bitmap) {
+        val file = File(context.filesDir, "$name.template.png")
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+    }
+
+    fun loadTemplate(context: Context, name: String): Bitmap? {
+        val file = File(context.filesDir, "$name.template.png")
+        return if (file.exists()) android.graphics.BitmapFactory.decodeFile(file.absolutePath) else null
+    }
+
+    fun listTemplates(context: Context): List<String> {
+        return context.filesDir.listFiles()?.filter { it.name.endsWith(".template.png") }?.map { it.name.removeSuffix(".template.png") } ?: emptyList()
+    }
+
+    fun deleteTemplate(context: Context, name: String) {
+        val file = File(context.filesDir, "$name.template.png")
+        if (file.exists()) file.delete()
+    }
+}\n\n===== app/src/main/res/layout/activity_corrections_manager.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Saved Corrections"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <ListView
+        android:id="@+id/correctionsList"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</LinearLayout>\n\n===== app/src/main/res/layout/activity_main.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/editMacroName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Macro name" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/btnRecord"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Record" />
+        <Button
+            android:id="@+id/btnPlay"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Play" />
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Save" />
+        <Button
+            android:id="@+id/btnLoad"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Load" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Saved Macros"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <ListView
+        android:id="@+id/macroList"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Timeline Editor"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <ListView
+        android:id="@+id/timelineList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Scripting Console"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <EditText
+        android:id="@+id/editScript"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:hint="Write your script here..."
+        android:gravity="top|start"
+        android:inputType="textMultiLine"
+        android:scrollbars="vertical" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnRunScript"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Run" />
+        <Button
+            android:id="@+id/btnSaveScript"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Save" />
+        <Button
+            android:id="@+id/btnLoadScript"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Load" />
+        <Button
+            android:id="@+id/btnScriptHelp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Help" />
+    </LinearLayout>
+    <ListView
+        android:id="@+id/scriptList"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Template Management"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnCaptureTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Capture" />
+        <Button
+            android:id="@+id/btnUploadTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Upload" />
+        <Button
+            android:id="@+id/btnDeleteTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Delete" />
+        <Button
+            android:id="@+id/btnTestTemplate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Test Match" />
+    </LinearLayout>
+    <ListView
+        android:id="@+id/templateList"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginBottom="8dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OCR Test"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp" />
+    <Button
+        android:id="@+id/btnTestOCR"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Test OCR on Screen" />
+    <Button
+        android:id="@+id/btnCorrectionsManager"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Manage Corrections"
+        android:layout_marginTop="12dp" />
+
+</LinearLayout>\n\n===== app/src/main/res/layout/correction_list_item.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/correctionListName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textStyle="bold"
+        android:text="Correction Name" />
+
+    <TextView
+        android:id="@+id/correctionListDesc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Description" />
+
+    <TextView
+        android:id="@+id/correctionListType"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Type" />
+
+</LinearLayout>\n\n===== app/src/main/res/layout/dialog_correction.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <ImageView
+        android:id="@+id/correctionScreenshot"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="Screenshot preview" />
+
+    <TextView
+        android:id="@+id/correctionOcrText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="OCR result here"
+        android:paddingTop="8dp" />
+
+    <EditText
+        android:id="@+id/correctionName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Correction name (optional)" />
+
+    <EditText
+        android:id="@+id/correctionDesc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Description (optional)" />
+
+</LinearLayout>\n\n===== app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M0,0h108v108h-108z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,18a36,36 0 1,0 0,72a36,36 0 1,0 0,-72z"/>
+</vector>\n\n===== app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@android:color/white"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>\n\n===== app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@android:color/white"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>\n\n===== app/src/main/res/values/strings.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CLICKAI Macro App</string>
+    <string name="accessibility_service_description">CLICKAI Macro Accessibility Service for recording and automating gestures in games.</string>
+</resources>\n\n===== app/src/main/res/xml/accessibility_service_config.xml =====\n
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeAllMask"
+    android:packageNames=""
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+    android:settingsActivity=""
+    android:description="@string/accessibility_service_description"
+    android:canPerformGestures="true" />\n\n===== app/src/main/AndroidManifest.xml =====\n
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        <activity android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".macro.engine.MacroAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+    </application>
+
+    <!-- Permissions for macro automation and screen recognition will be added here -->
+
+</manifest>
