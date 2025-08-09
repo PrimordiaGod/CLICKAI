@@ -1,2 +1,15 @@
-node_modules/
-.env
+# Gradle
+.gradle/
+/build/
+/local.properties
+**/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Generated
+.cxx/
