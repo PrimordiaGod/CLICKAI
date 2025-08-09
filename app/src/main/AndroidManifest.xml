@@ -18,6 +18,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.primordia.clickai.ui.PatternEditorActivity"
+            android:exported="false" />
+
         <service
             android:name="com.primordia.clickai.accessibility.ClickAiAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

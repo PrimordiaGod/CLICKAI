@@ -66,6 +66,11 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
+    implementation("androidx.constraintlayout:constraintlayout:2.2.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+
+    // JSON
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // ML Kit Text Recognition v2
     implementation("com.google.mlkit:text-recognition:16.0.1")

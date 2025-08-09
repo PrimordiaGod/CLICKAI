@@ -14,14 +14,34 @@ data class Swipe(
 
 data class Wait(val durationMs: Long) : Step { override val type = "Wait" }
 
-data class OcrWait(val text: String, val timeoutMs: Long, val region: Region? = null) : Step { override val type = "OcrWait" }
+data class InputText(val text: String) : Step { override val type = "InputText" }
+
+data class OcrWait(
+    val textOrRegex: String,
+    val timeoutMs: Long,
+    val region: Region? = null,
+    val isRegex: Boolean = false
+) : Step { override val type = "OcrWait" }
 
 data class ImageMatch(
     val templateAsset: String,
     val threshold: Float,
     val timeoutMs: Long,
-    val region: Region? = null
+    val region: Region? = null,
+    val multiScale: Boolean = true
 ) : Step { override val type = "ImageMatch" }
+
+data class ColorWait(
+    val color: Int,
+    val tolerance: Int,
+    val region: Region,
+    val timeoutMs: Long
+) : Step { override val type = "ColorWait" }
+
+data class PatternWait(
+    val patternName: String,
+    val timeoutMs: Long
+) : Step { override val type = "PatternWait" }
 
 data class Loop(val count: Int, val steps: List<Step>) : Step { override val type = "Loop" }
 

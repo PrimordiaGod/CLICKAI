@@ -13,10 +13,9 @@ import com.primordia.clickai.util.BitmapUtils
 class OcrDetector(
     private val screenshotProvider: () -> Bitmap?
 ) {
-
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-    fun containsText(query: String, region: Region?): Boolean {
+    fun containsText(queryOrPattern: String, region: Region?, isRegex: Boolean = false): Boolean {
         val bmp = screenshotProvider() ?: return false
         val cropped = if (region != null) {
             val rect = Rect(region.left, region.top, region.right, region.bottom)
@@ -26,7 +25,9 @@ class OcrDetector(
         return try {
             val image = InputImage.fromBitmap(cropped, 0)
             val result = Tasks.await(recognizer.process(image))
-            flattenText(result).contains(query, ignoreCase = true)
+            val flat = flattenText(result)
+            if (isRegex) Regex(queryOrPattern, RegexOption.IGNORE_CASE).containsMatchIn(flat)
+            else flat.contains(queryOrPattern, ignoreCase = true)
         } catch (t: Throwable) {
             Log.w("ClickAI", "OCR failed: ${t.message}")
             false
