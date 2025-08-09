@@ -7,6 +7,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.primordia.clickai.accessibility.ClickAiAccessibilityService
 import com.primordia.clickai.engine.*
+import com.primordia.clickai.patterns.PatternDetector
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
@@ -18,8 +19,7 @@ class MacroEditorViewModel(app: Application) : AndroidViewModel(app) {
     private var runner: MacroRunner? = null
 
     private fun screenshotProvider(): Bitmap? {
-        // TODO: integrate MediaProjection or AccessibilityService.takeScreenshot on API 33+
-        return null
+        return ServiceLocator.service?.captureScreenshotBlocking()
     }
 
     fun startSampleMacro(context: android.content.Context) {
@@ -28,10 +28,17 @@ class MacroEditorViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
 
+        val ocr = OcrDetector(::screenshotProvider)
+        val img = ImageMatchDetector(::screenshotProvider)
+        val color = ColorDetector(::screenshotProvider)
+        val pattern = PatternDetector(::screenshotProvider, ocr, img) { null }
+
         val engine = MacroEngine(
             svc = svc,
-            ocr = OcrDetector(::screenshotProvider),
-            img = ImageMatchDetector(::screenshotProvider)
+            ocr = ocr,
+            img = img,
+            colors = color,
+            patterns = pattern
         )
         val macro = Macro(
             name = "Sample",
@@ -46,9 +53,7 @@ class MacroEditorViewModel(app: Application) : AndroidViewModel(app) {
         val r = MacroRunner(engine)
         runner = r
         _status.value = "Running"
-        MainScope().launch {
-            r.start(macro)
-        }
+        MainScope().launch { r.start(macro) }
     }
 
     fun stopMacro() {
@@ -56,7 +61,5 @@ class MacroEditorViewModel(app: Application) : AndroidViewModel(app) {
         _status.value = "Stopped"
     }
 
-    private fun getService(): ClickAiAccessibilityService? {
-        return ServiceLocator.service
-    }
+    private fun getService(): ClickAiAccessibilityService? = ServiceLocator.service
 }

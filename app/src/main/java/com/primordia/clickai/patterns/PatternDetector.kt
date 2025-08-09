@@ -1,8 +1,8 @@
 package com.primordia.clickai.patterns
 
 import android.graphics.Bitmap
-import android.graphics.PointF
-import com.google.gson.Gson
+import android.graphics.Rect
+import com.primordia.clickai.engine.ColorDetector
 import com.primordia.clickai.engine.ImageMatchDetector
 import com.primordia.clickai.engine.OcrDetector
 
@@ -10,10 +10,9 @@ class PatternDetector(
     private val screenshotProvider: () -> Bitmap?,
     private val ocr: OcrDetector,
     private val img: ImageMatchDetector,
-    private val loadPatternByName: (String) -> Pattern?
+    private val loadPatternByName: (String) -> Pattern?,
+    private val color: ColorDetector? = null
 ) {
-    private val gson = Gson()
-
     fun detectByName(name: String): Boolean {
         val p = loadPatternByName(name) ?: return false
         return detect(p)
@@ -21,26 +20,49 @@ class PatternDetector(
 
     fun detect(pattern: Pattern): Boolean {
         val bmp = screenshotProvider() ?: return false
-        // Element detections -> bounding boxes
-        val boxes = mutableMapOf<String, android.graphics.Rect>()
+        val boxes = mutableMapOf<String, Rect>()
         for (e in pattern.elements) {
             when (e) {
                 is ImageElement -> {
-                    // Needs a way to load template bitmap from assetPath; skip if not available
-                    // Assume not detected in scaffolding: return false
+                    // TODO: Load template bitmap and use img.findTemplateCenter(templateBitmap,...)
                     return false
                 }
                 is TextElement -> {
-                    val ok = ocr.containsText(e.query, null, e.isRegex)
-                    if (!ok) return false
-                    // Without exact boxes from OCR, we pass presence check only
+                    val lines = ocr.extractLines(null) ?: return false
+                    val match = if (e.isRegex) {
+                        val rx = Regex(e.query, RegexOption.IGNORE_CASE)
+                        lines.firstOrNull { rx.containsMatchIn(it.first) }
+                    } else {
+                        lines.firstOrNull { it.first.contains(e.query, ignoreCase = true) }
+                    }
+                    if (match == null) return false
+                    boxes[e.id] = match.second
                 }
                 is ColorElement -> {
-                    // Color presence handled at macro level; here we assume pass-through
+                    val ok = color?.containsColor(e.region.toEngineRegion(), e.color, e.tolerance) ?: false
+                    if (!ok) return false
+                    boxes[e.id] = e.region.toAndroidRect()
                 }
             }
         }
-        // Spatial relations would need element boxes; in scaffolding we only validate presence
+        // Check relations
+        for (rel in pattern.relations) {
+            val a = boxes[rel.fromId] ?: return false
+            val b = boxes[rel.toId] ?: return false
+            if (!satisfies(a, b, rel)) return false
+        }
         return true
     }
+
+    private fun satisfies(a: Rect, b: Rect, rel: Relation): Boolean {
+        return when (rel.type) {
+            RelationType.ABOVE -> a.bottom + rel.minPx <= b.top && a.bottom + rel.maxPx >= b.top
+            RelationType.BELOW -> a.top >= b.bottom + rel.minPx && a.top <= b.bottom + rel.maxPx
+            RelationType.LEFT_OF -> a.right + rel.minPx <= b.left && a.right + rel.maxPx >= b.left
+            RelationType.RIGHT_OF -> a.left >= b.right + rel.minPx && a.left <= b.right + rel.maxPx
+        }
+    }
 }
+
+private fun Region.toAndroidRect(): Rect = Rect(left, top, right, bottom)
+private fun Region.toEngineRegion(): com.primordia.clickai.engine.Region = com.primordia.clickai.engine.Region(left, top, right, bottom)
