@@ -1,22 +1,25 @@
 package com.primordia.clickai.engine
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.PointF
 import android.graphics.Rect
 import android.util.Log
 import kotlin.math.sqrt
 
 class ImageMatchDetector(
-    private val screenshotProvider: () -> Bitmap?
+    private val screenshotProvider: () -> Bitmap?,
 ) {
+    private var templateProvider: ((String) -> Bitmap?)? = null
+
+    fun setTemplateProvider(provider: (String) -> Bitmap?) { templateProvider = provider }
+
     fun findTemplateCenter(templateAsset: String, threshold: Float, region: Region?, multiScale: Boolean = true): PointF? {
-        val screenshot = screenshotProvider() ?: return null
-        // Load template bitmap from assets path style "templates/name.png"; caller should provide loader.
-        // For scaffolding, return null. Real builds should pass a provider or preload templates.
-        return null
+        val loader = templateProvider ?: return null
+        val tpl = loader(templateAsset) ?: return null
+        return findTemplateCenter(tpl, threshold, region, multiScale)
     }
 
-    // Optional: pure CPU match on provided bitmaps
     fun findTemplateCenter(template: Bitmap, threshold: Float, region: Region?, multiScale: Boolean = true): PointF? {
         val screenshot = screenshotProvider() ?: return null
         val search = if (region != null) Bitmap.createBitmap(
@@ -56,13 +59,13 @@ class ImageMatchDetector(
         val srcPixels = IntArray(search.width * search.height)
         template.getPixels(tplPixels, 0, template.width, 0, 0, template.width, template.height)
         search.getPixels(srcPixels, 0, search.width, 0, 0, search.width, search.height)
-        // Convert to grayscale luminance for speed
         fun lum(c: Int): Int { val r=(c shr 16) and 0xFF; val g=(c shr 8) and 0xFF; val b=c and 0xFF; return (0.299*r + 0.587*g + 0.114*b).toInt() }
         val tplY = IntArray(tplPixels.size) { lum(tplPixels[it]) }
         val tplMean = tplY.average()
         val tplStd = sqrt(tplY.fold(0.0) { acc, v -> acc + (v - tplMean) * (v - tplMean) } / tplY.size)
         if (tplStd == 0.0) return null
         var best = MatchResult(0, 0, -1.0)
+        val n = template.width * template.height
         for (y in 0..(search.height - template.height)) {
             for (x in 0..(search.width - template.width)) {
                 var sum = 0.0
@@ -79,7 +82,6 @@ class ImageMatchDetector(
                         cross += (s) * (t - tplMean)
                     }
                 }
-                val n = template.width * template.height
                 val mean = sum / n
                 val std = sqrt(sumSq / n - mean * mean)
                 if (std == 0.0) continue

@@ -24,5 +24,10 @@ class MainActivity : ComponentActivity() {
         binding.btnStop.setOnClickListener { vm.stopMacro() }
 
         vm.status.observe(this) { binding.txtStatus.text = "Status: $it" }
+
+        // Open pattern editor (reusing stop button long-press for simplicity)
+        binding.btnStop.setOnLongClickListener {
+            startActivity(Intent(this, PatternEditorActivity::class.java)); true
+        }
     }
 }
