@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CLICKAI Macro",
+  "type": "object",
+  "required": ["version", "name", "steps"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "name": { "type": "string", "minLength": 1 },
+    "steps": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/Click" },
+          { "$ref": "#/$defs/Swipe" },
+          { "$ref": "#/$defs/Wait" },
+          { "$ref": "#/$defs/OcrWait" },
+          { "$ref": "#/$defs/ImageMatch" },
+          { "$ref": "#/$defs/Loop" },
+          { "$ref": "#/$defs/Conditional" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "Click": {
+      "type": "object",
+      "required": ["type", "x", "y"],
+      "properties": {
+        "type": { "const": "Click" },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "Swipe": {
+      "type": "object",
+      "required": ["type", "from", "to", "durationMs"],
+      "properties": {
+        "type": { "const": "Swipe" },
+        "from": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "to": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "durationMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "Wait": {
+      "type": "object",
+      "required": ["type", "durationMs"],
+      "properties": {
+        "type": { "const": "Wait" },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "OcrWait": {
+      "type": "object",
+      "required": ["type", "text", "timeoutMs"],
+      "properties": {
+        "type": { "const": "OcrWait" },
+        "text": { "type": "string" },
+        "timeoutMs": { "type": "integer", "minimum": 0 },
+        "region": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }
+      }
+    },
+    "ImageMatch": {
+      "type": "object",
+      "required": ["type", "templateAsset", "threshold", "timeoutMs"],
+      "properties": {
+        "type": { "const": "ImageMatch" },
+        "templateAsset": { "type": "string" },
+        "threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "timeoutMs": { "type": "integer", "minimum": 0 },
+        "region": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }
+      }
+    },
+    "Loop": {
+      "type": "object",
+      "required": ["type", "count", "steps"],
+      "properties": {
+        "type": { "const": "Loop" },
+        "count": { "type": "integer", "minimum": 1 },
+        "steps": { "type": "array", "items": { "$ref": "#" } }
+      }
+    },
+    "Conditional": {
+      "type": "object",
+      "required": ["type", "if", "then"],
+      "properties": {
+        "type": { "const": "Conditional" },
+        "if": {
+          "type": "object",
+          "oneOf": [
+            { "$ref": "#/$defs/OcrWait" },
+            { "$ref": "#/$defs/ImageMatch" }
+          ]
+        },
+        "then": { "type": "array", "items": { "$ref": "#" } },
+        "else": { "type": "array", "items": { "$ref": "#" } }
+      }
+    }
+  }
+}

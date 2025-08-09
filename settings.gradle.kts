@@ -5,5 +5,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = 'CLICKAI'
-include ':app'
+
+rootProject.name = "CLICKAI"
+include(":app")
